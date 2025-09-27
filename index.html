@@ -167,10 +167,7 @@
         <div class="cell"><label for="locationFieldName">Field for location</label><input id="locationFieldName" type="text" value="location"></div>
         <div class="cell"><label for="remember">Remember on this device</label><input id="remember" class="toggle" type="checkbox" checked></div>
       </div>
-      <h3>Diagnostics</h3>
-      <div class="list" id="diagList"></div>
       <div class="actions">
-        <button id="runDiag" class="btn">Run diagnostics</button>
         <button id="saveSettings" class="btn primary">Save</button>
         <button id="closeSettings" class="btn">Close</button>
         <button id="resetSettings" class="btn">Reset</button>
@@ -239,9 +236,6 @@
     scanQrBtn: document.getElementById('scanQrBtn'),
     qrOverlay: document.getElementById('qrOverlay'),
     qrVideo: document.getElementById('qrVideo'),
-
-    runDiag: document.getElementById('runDiag'),
-    diagList: document.getElementById('diagList'),
     filePick: document.getElementById('filePick'),
 
     chemResults: document.getElementById('chemResults'),
@@ -359,20 +353,6 @@
   }
 
   // ===== diagnostics =====
-  async function runDiagnostics(){
-    const rows = [];
-    function push(label, pass, note){ rows.push('<div class="cell"><label>' + label + '</label><div>' + (pass? '✅' : '❌') + ' <span class="mono">' + (note||'') + '</span></div></div>'); }
-    push('Secure origin', isSecureOrigin(), location.protocol + '//' + location.host);
-    push('mediaDevices', !!navigator.mediaDevices);
-    push('getUserMedia', !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia));
-    try{
-      const devs = await navigator.mediaDevices.enumerateDevices();
-      const cams = devs.filter(function(d){ return d.kind==='videoinput'; });
-      push('Cameras found', cams.length>0, String(cams.length));
-    }catch(e){ push('enumerateDevices', false, e.message); }
-    els.diagList.innerHTML = '<div class="list">' + rows.join('') + '</div>';
-  }
-
   // ===== camera =====
   async function startCamera(){
     if(!isSecureOrigin()){
@@ -523,7 +503,7 @@
   document.getElementById('closeSettings').addEventListener('click', function(){ els.settingsSheet.classList.remove('active'); });
   document.getElementById('resetSettings').addEventListener('click', function(){ store.clear(); loadSettings(); setStatus('Settings reset.', 'warn'); });
   document.getElementById('saveSettings').addEventListener('click', function(){ saveSettings(); els.settingsSheet.classList.remove('active'); });
-  document.getElementById('runDiag').addEventListener('click', runDiagnostics);
+  
 
   document.getElementById('shutter').addEventListener('click', takePhoto);
   document.getElementById('upload').addEventListener('click', upload);
@@ -574,7 +554,7 @@
     assert('parseChemicals empty -> []', Array.isArray(t4) && t4.length===0);
 
     const list = results.map(function(r){ return '<div class="cell"><label>' + r.name + '</label><div>' + (r.pass? '✅' : '❌') + '</div></div>'; }).join('');
-    els.diagList.innerHTML = '<div class="list">' + list + '</div>';
+    /* diagnostics UI removed */
     return results.every(function(r){ return r.pass; });
   }
 
