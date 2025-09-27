@@ -330,6 +330,50 @@
     }catch(e){ return []; }
   }
 
+  // ===== image conversion helper (always JPEG) =====
+  function fitSize(w, h, maxDim){
+    if(!maxDim) maxDim = 2048;
+    var rw = w, rh = h;
+    if(w > h && w > maxDim){ rh = Math.round(h * maxDim / w); rw = maxDim; }
+    else if(h >= w && h > maxDim){ rw = Math.round(w * maxDim / h); rh = maxDim; }
+    return { w: rw, h: rh };
+  }
+  function fileToJpegBlob(file){
+    return new Promise(async function(resolve){
+      try{
+        if('createImageBitmap' in window){
+          var bmp = null;
+          try{ bmp = await createImageBitmap(file); }catch(e){ bmp = null; }
+          if(bmp){
+            var size = fitSize(bmp.width, bmp.height, 2048);
+            els.canvas.width = size.w; els.canvas.height = size.h;
+            var ctx = els.canvas.getContext('2d');
+            ctx.drawImage(bmp, 0, 0, size.w, size.h);
+            return els.canvas.toBlob(function(b){ resolve(b || file); }, 'image/jpeg', 0.92);
+          }
+        }
+      }catch(e){}
+      // Fallback via Image element
+      try{
+        var reader = new FileReader();
+        reader.onload = function(){
+          var img = new Image();
+          img.onload = function(){
+            var size2 = fitSize(img.naturalWidth||img.width, img.naturalHeight||img.height, 2048);
+            els.canvas.width = size2.w; els.canvas.height = size2.h;
+            var ctx2 = els.canvas.getContext('2d');
+            ctx2.drawImage(img, 0, 0, size2.w, size2.h);
+            els.canvas.toBlob(function(b){ resolve(b || file); }, 'image/jpeg', 0.92);
+          };
+          img.onerror = function(){ resolve(file); };
+          img.src = reader.result;
+        };
+        reader.onerror = function(){ resolve(file); };
+        reader.readAsDataURL(file);
+      }catch(e){ resolve(file); }
+    });
+  }
+
   // ===== results renderer =====
   function renderChemicals(arr){
     if(!arr || !arr.length){
@@ -511,9 +555,23 @@
   document.getElementById('scanQrBtn').addEventListener('click', startQrScan);
 
   document.getElementById('filePick').addEventListener('change', async function(ev){
-    const f = ev.target.files && ev.target.files[0]; if(!f) return;
-    photoBlob = f; photoName = f.name || derivePhotoName(); updateThumbFromBlob(photoBlob); updateUploadButton(); setStatus('Selected from Photos: ' + photoName, 'ok');
-    await autoUploadOrSettings();
+    var f = ev.target.files && ev.target.files[0]; if(!f) return;
+    try{
+      setStatus('Converting to JPEG…', 'warn');
+      var jpeg = await fileToJpegBlob(f);
+      // enforce JPEG type
+      if(!(jpeg && jpeg.type && jpeg.type.indexOf('image/jpeg') === 0)){
+        // some browsers may return type=""; still treat as jpeg
+      }
+      photoBlob = jpeg || f;
+      photoName = derivePhotoName();
+      updateThumbFromBlob(photoBlob);
+      updateUploadButton();
+      setStatus('Selected from Photos: ' + photoName + ' (JPEG)', 'ok');
+      await autoUploadOrSettings();
+    }catch(e){
+      setStatus('Photo conversion failed: ' + (e && e.message ? e.message : e), 'err');
+    }
   });
 
   // ===== self-tests (lightweight) =====
@@ -528,6 +586,7 @@
     assert('Photo name suffix .jpg', nm.slice(-4) === '.jpg');
     assert('Photo name includes bluemilk_', nm.indexOf('bluemilk_') === 0);
     assert('isSecureOrigin boolean', typeof isSecureOrigin() === 'boolean');
+    assert('fileToJpegBlob function', typeof fileToJpegBlob === 'function');
 
     // overlay tests
     setStatus('Test status');
