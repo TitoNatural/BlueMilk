@@ -179,9 +179,9 @@
   // ===== storage utils =====
   const store = {
     key: 'bluemilk:v1',
-    read(){ try{ return JSON.parse(localStorage.getItem(this.key)) || {}; }catch{return{};} },
-    write(obj){ localStorage.setItem(this.key, JSON.stringify(obj)); },
-    clear(){ localStorage.removeItem(this.key); }
+    read: function(){ try{ return JSON.parse(localStorage.getItem(this.key)) || {}; }catch(e){ return {}; } },
+    write: function(obj){ localStorage.setItem(this.key, JSON.stringify(obj)); },
+    clear: function(){ localStorage.removeItem(this.key); }
   };
   // migrate legacy ChemSnap keys if present
   function migrateFromLegacy(){
@@ -189,11 +189,12 @@
       const existing = localStorage.getItem(store.key);
       if(existing) return; // already migrated
       const legacyKeys = ['chemsnap:v2','chemsnap:v1','chemsnap:v0'];
-      for(const k of legacyKeys){
+      for(var i=0;i<legacyKeys.length;i++){
+        const k = legacyKeys[i];
         const v = localStorage.getItem(k);
         if(v){ localStorage.setItem(store.key, v); break; }
       }
-    }catch{}
+    }catch(e){}
   }
 
   // ===== elements =====
@@ -232,57 +233,56 @@
   };
 
   // ===== state =====
-  let mediaStream = null;
-  let facing = 'environment';
-  let photoBlob = null;
-  let photoName = null;
-  let qrStream = null;
-  let scanning = false;
-  let statusHideTimer = null;
-  let lastStatusURL = null;
+  var mediaStream = null;
+  var facing = 'environment';
+  var photoBlob = null;
+  var photoName = null;
+  var qrStream = null;
+  var scanning = false;
+  var statusHideTimer = null;
+  var lastStatusURL = null;
 
   // ===== helpers =====
-  const setStatus = (msg, cls='') => {
-    els.status.className = `status ${cls} show`;
-    els.status.textContent = msg;
-    scheduleStatusHide(cls || 'ok');
-  };
-  function setStatusRich(msg, cls='ok', includeThumb=false){
-    els.status.className = `status ${cls} show`;
-    if(includeThumb && photoBlob){
-      const url = URL.createObjectURL(photoBlob);
-      if(lastStatusURL && lastStatusURL !== url){ try{ URL.revokeObjectURL(lastStatusURL); }catch{} }
-      lastStatusURL = url;
-      els.status.innerHTML = `<div class="row"><img class="miniThumb" src="${url}" alt="sent photo"/><div>${msg}</div></div>`;
-    } else {
-      els.status.textContent = msg;
-    }
-    scheduleStatusHide(cls || 'ok');
-  } show`;
-    if(includeThumb && photoBlob){
-      const url = URL.createObjectURL(photoBlob);
-      els.status.innerHTML = `<div class="row"><img class="miniThumb" src="${url}" alt="sent photo"/><div>${msg}</div></div>`;
-    } else {
-      els.status.textContent = msg;
-    }
-  }
   function scheduleStatusHide(kind){
-    try{ clearTimeout(statusHideTimer); }catch{}
-    let ms = 3200;
+    try{ clearTimeout(statusHideTimer); }catch(e){}
+    var ms = 3200;
     if(kind === 'err') ms = 6000;
     else if(kind === 'warn') ms = 3800;
     else if(kind === 'ok') ms = 2600;
-    statusHideTimer = setTimeout(() => {
+    statusHideTimer = setTimeout(function(){
       els.status.classList.remove('show');
-      if(lastStatusURL){ try{ URL.revokeObjectURL(lastStatusURL); }catch{} lastStatusURL = null; }
+      if(lastStatusURL){ try{ URL.revokeObjectURL(lastStatusURL); }catch(e){} lastStatusURL = null; }
     }, ms);
   }
-  const b64 = s => btoa(unescape(encodeURIComponent(s)));
-  const buildAuthHeader = (u,p) => 'Basic ' + b64(`${u||''}:${p||''}`);
-  const nowIso = () => new Date().toISOString();
+
+  function setStatus(msg, cls){
+    if(typeof cls === 'undefined') cls = '';
+    els.status.className = 'status ' + (cls || '') + ' show';
+    els.status.textContent = msg;
+    scheduleStatusHide(cls || 'ok');
+  }
+
+  function setStatusRich(msg, cls, includeThumb){
+    if(typeof cls === 'undefined') cls = 'ok';
+    if(typeof includeThumb === 'undefined') includeThumb = false;
+    els.status.className = 'status ' + (cls || '') + ' show';
+    if(includeThumb && photoBlob){
+      const url = URL.createObjectURL(photoBlob);
+      if(lastStatusURL && lastStatusURL !== url){ try{ URL.revokeObjectURL(lastStatusURL); }catch(e){} }
+      lastStatusURL = url;
+      els.status.innerHTML = '<div class="row"><img class="miniThumb" src="' + url + '" alt="sent photo"/><div>' + msg + '</div></div>';
+    } else {
+      els.status.textContent = msg;
+    }
+    scheduleStatusHide(cls || 'ok');
+  }
+
+  function b64(s){ return btoa(unescape(encodeURIComponent(s))); }
+  function buildAuthHeader(u,p){ return 'Basic ' + b64((u||'') + ':' + (p||'')); }
+  function nowIso(){ return new Date().toISOString(); }
   function derivePhotoName(){
-    const ts = nowIso().replaceAll(':','').replaceAll('-','').replace('T','_').replace('Z','');
-    return `bluemilk_${ts}.jpg`;
+    const ts = nowIso().replace(/:/g,'').replace(/-/g,'').replace('T','_').replace('Z','');
+    return 'bluemilk_' + ts + '.jpg';
   }
   function isSecureOrigin(){
     return location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
@@ -290,9 +290,9 @@
   function updateThumbFromBlob(blob){ if(!blob){ els.thumb.src=''; return; } els.thumb.src = URL.createObjectURL(blob); }
   function updateLocationHint(){
     const val = (els.location.value||'').trim();
-    els.locHint.textContent = val ? `Signed into: ${val}` : 'Scan QR to sign into a location';
+    els.locHint.textContent = val ? ('Signed into: ' + val) : 'Scan QR to sign into a location';
   }
-  function hasUploadSettings(){ return (els.endpoint.value?.length>7) && (els.username.value?.length>0); }
+  function hasUploadSettings(){ return (els.endpoint.value && els.endpoint.value.length>7) && (els.username.value && els.username.value.length>0); }
   function updateUploadButton(){ els.upload.disabled = !photoBlob || !hasUploadSettings(); }
 
   function openSettingsWithHint(hint){
@@ -311,16 +311,16 @@
   // ===== diagnostics =====
   async function runDiagnostics(){
     const rows = [];
-    const push = (label, pass, note='') => rows.push(`<div class="cell"><label>${label}</label><div>${pass? '✅' : '❌'} <span class="mono">${note}</span></div></div>`);
+    function push(label, pass, note){ rows.push('<div class="cell"><label>' + label + '</label><div>' + (pass? '✅' : '❌') + ' <span class="mono">' + (note||'') + '</span></div></div>'); }
     push('Secure origin', isSecureOrigin(), location.protocol + '//' + location.host);
     push('mediaDevices', !!navigator.mediaDevices);
     push('getUserMedia', !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia));
     try{
       const devs = await navigator.mediaDevices.enumerateDevices();
-      const cams = devs.filter(d=>d.kind==='videoinput');
-      push('Cameras found', cams.length>0, `${cams.length}`);
+      const cams = devs.filter(function(d){ return d.kind==='videoinput'; });
+      push('Cameras found', cams.length>0, String(cams.length));
     }catch(e){ push('enumerateDevices', false, e.message); }
-    els.diagList.innerHTML = `<div class="list">${rows.join('')}</div>`;
+    els.diagList.innerHTML = '<div class="list">' + rows.join('') + '</div>';
   }
 
   // ===== camera =====
@@ -353,7 +353,7 @@
     }
   }
 
-  function stopCamera(){ if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream = null; } }
+  function stopCamera(){ if(mediaStream){ mediaStream.getTracks().forEach(function(t){ t.stop(); }); mediaStream = null; } }
 
   function captureFrameToBlob(){
     const v = els.video; const c = els.canvas;
@@ -363,7 +363,7 @@
     c.width = w; c.height = h;
     const ctx = c.getContext('2d');
     ctx.drawImage(v, 0, 0, w, h);
-    return new Promise(resolve => c.toBlob(b => resolve(b), 'image/jpeg', 0.92));
+    return new Promise(function(resolve){ c.toBlob(function(b){ resolve(b); }, 'image/jpeg', 0.92); });
   }
 
   async function takePhoto(){
@@ -374,7 +374,7 @@
     updateThumbFromBlob(photoBlob);
     els.preview.src = URL.createObjectURL(photoBlob);
     updateUploadButton();
-    setStatus(`Photo captured: ${photoName}`, 'ok');
+    setStatus('Photo captured: ' + photoName, 'ok');
     await autoUploadOrSettings();
   }
 
@@ -401,7 +401,7 @@
         mode: 'cors',
         redirect: 'follow'
       });
-      const text = await res.text().catch(()=> '');
+      const text = await res.text().catch(function(){ return ''; });
       if(res.ok){
         setStatusRich('Upload successful.', 'ok', true);
       } else {
@@ -421,7 +421,7 @@
       scanLoop();
     }catch(err){ setStatus('QR scanner failed: ' + err.message, 'err'); stopQrScan(); }
   }
-  function stopQrScan(){ scanning = false; els.qrOverlay.classList.remove('active'); if(qrStream){ qrStream.getTracks().forEach(t=>t.stop()); qrStream=null; } }
+  function stopQrScan(){ scanning = false; els.qrOverlay.classList.remove('active'); if(qrStream){ qrStream.getTracks().forEach(function(t){ t.stop(); }); qrStream=null; } }
 
   async function scanLoop(){
     if(typeof window.jsQR !== 'function'){ setStatus('QR library not loaded.', 'err'); return; }
@@ -433,7 +433,7 @@
         const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
         if(code && code.data){ els.location.value = code.data.trim(); updateLocationHint(); setStatus('QR captured: ' + els.location.value, 'ok'); stopQrScan(); break; }
       }
-      await new Promise(r=>setTimeout(r,120));
+      await new Promise(function(r){ setTimeout(r,120); });
     }
   }
 
@@ -462,10 +462,10 @@
   }
 
   // ===== events =====
-  document.getElementById('openSettings').addEventListener('click', ()=> els.settingsSheet.classList.add('active'));
-  document.getElementById('closeSettings').addEventListener('click', ()=> els.settingsSheet.classList.remove('active'));
-  document.getElementById('resetSettings').addEventListener('click', ()=> { store.clear(); loadSettings(); setStatus('Settings reset.', 'warn'); });
-  document.getElementById('saveSettings').addEventListener('click', ()=>{ saveSettings(); els.settingsSheet.classList.remove('active'); });
+  document.getElementById('openSettings').addEventListener('click', function(){ els.settingsSheet.classList.add('active'); });
+  document.getElementById('closeSettings').addEventListener('click', function(){ els.settingsSheet.classList.remove('active'); });
+  document.getElementById('resetSettings').addEventListener('click', function(){ store.clear(); loadSettings(); setStatus('Settings reset.', 'warn'); });
+  document.getElementById('saveSettings').addEventListener('click', function(){ saveSettings(); els.settingsSheet.classList.remove('active'); });
   document.getElementById('runDiag').addEventListener('click', runDiagnostics);
 
   document.getElementById('shutter').addEventListener('click', takePhoto);
@@ -473,39 +473,45 @@
 
   document.getElementById('scanQrBtn').addEventListener('click', startQrScan);
 
-  document.getElementById('filePick').addEventListener('change', async ev => {
-    const f = ev.target.files?.[0]; if(!f) return;
-    photoBlob = f; photoName = f.name || derivePhotoName(); updateThumbFromBlob(photoBlob); updateUploadButton(); setStatus(`Selected from Photos: ${photoName}`, 'ok');
+  document.getElementById('filePick').addEventListener('change', async function(ev){
+    const f = ev.target.files && ev.target.files[0]; if(!f) return;
+    photoBlob = f; photoName = f.name || derivePhotoName(); updateThumbFromBlob(photoBlob); updateUploadButton(); setStatus('Selected from Photos: ' + photoName, 'ok');
     await autoUploadOrSettings();
   });
 
   // ===== self-tests (lightweight) =====
   function runSelfTests(){
     const results = [];
-    function assert(name, cond){ results.push({ name, pass: !!cond }); }
+    function assert(name, cond){ results.push({ name: name, pass: !!cond }); }
     // existing tests
     const hdr = buildAuthHeader('u','p');
-    assert('Auth header prefix', hdr.startsWith('Basic '));
+    assert('Auth header prefix', hdr.indexOf('Basic ') === 0);
     assert('Auth header body length > 6', hdr.length > 6);
     const nm = derivePhotoName();
-    assert('Photo name suffix .jpg', nm.endsWith('.jpg'));
-    assert('Photo name includes bluemilk_', nm.startsWith('bluemilk_'));
+    assert('Photo name suffix .jpg', nm.slice(-4) === '.jpg');
+    assert('Photo name includes bluemilk_', nm.indexOf('bluemilk_') === 0);
     assert('isSecureOrigin boolean', typeof isSecureOrigin() === 'boolean');
 
     // new tests
     setStatus('Test status');
-    assert('setStatus shows overlay', els.status.className.includes('show'));
+    assert('setStatus shows overlay', els.status.className.indexOf('show') !== -1);
 
     const prevBlob = photoBlob;
     photoBlob = new Blob([new Uint8Array([0,1,2,3])], { type: 'image/png' });
     setStatusRich('Test rich', 'ok', true);
-    assert('setStatusRich shows overlay', els.status.className.includes('show'));
-    assert('setStatusRich inserts miniThumb', els.status.innerHTML.includes('miniThumb'));
+    assert('setStatusRich shows overlay', els.status.className.indexOf('show') !== -1);
+    assert('setStatusRich inserts miniThumb', els.status.innerHTML.indexOf('miniThumb') !== -1);
     photoBlob = prevBlob;
 
-    const list = results.map(r=>`<div class="cell"><label>${r.name}</label><div>${r.pass? '✅' : '❌'}</div></div>`).join('');
+    // location hint toggles
+    els.location.value = 'A-01'; updateLocationHint();
+    assert('locHint shows signed in', els.locHint.textContent.indexOf('Signed into: A-01') !== -1);
+    els.location.value = ''; updateLocationHint();
+    assert('locHint shows scan hint', els.locHint.textContent.indexOf('Scan QR to sign into a location') !== -1);
+
+    const list = results.map(function(r){ return '<div class="cell"><label>' + r.name + '</label><div>' + (r.pass? '✅' : '❌') + '</div></div>'; }).join('');
     els.diagList.innerHTML = '<div class="list">' + list + '</div>';
-    return results.every(r=>r.pass);
+    return results.every(function(r){ return r.pass; });
   }
 
   // ===== init =====
@@ -520,7 +526,7 @@
     await startCamera();
   })();
 
-  window.addEventListener('beforeunload', () => { stopCamera(); });
+  window.addEventListener('beforeunload', function(){ stopCamera(); });
   </script>
 
   <!-- QR decoder -->
