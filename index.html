@@ -41,8 +41,9 @@
     .shutter{ width:74px; height:74px; border-radius:50%; background:#fff; border:6px solid rgba(255,255,255,.35); cursor:pointer; box-shadow:0 0 0 2px rgba(255,255,255,.12) inset; }
     .shutter:active{ transform:scale(.98); }
 
+    /* Centered status overlay */
     .status{ position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:70; min-width:min(92vw,460px); max-width:92vw; font-size:13px; padding:12px 14px; border-radius:12px; border:1px dashed #2f2f2f; color:#d8d8dd; background:rgba(20,20,20,.85); box-shadow:0 8px 40px rgba(0,0,0,.6); opacity:0; pointer-events:none; transition:opacity .18s ease, transform .18s ease; }
-.status.show{ opacity:1; }
+    .status.show{ opacity:1; }
     .status.ok{ border-color:#1f7a3a; color:#d7ffe7; background:#0f2218; }
     .status.err{ border-color:#7a1f1f; color:#ffd9d9; background:#240e12; }
     .status.warn{ border-color:#7a6a1f; color:#fff6d5; background:#241e0e; }
@@ -241,14 +242,7 @@
   // ===== helpers =====
   const setStatus = (msg, cls='') => { els.status.className = `status ${cls} show`; els.status.textContent = msg; };
   function setStatusRich(msg, cls='ok', includeThumb=false){
-  els.status.className = `status ${cls} show`;
-  if(includeThumb && photoBlob){
-    const url = URL.createObjectURL(photoBlob);
-    els.status.innerHTML = `<div class="row"><img class="miniThumb" src="${url}" alt="sent photo"/><div>${msg}</div></div>`;
-  } else {
-    els.status.textContent = msg;
-  }
-}`;
+    els.status.className = `status ${cls} show`;
     if(includeThumb && photoBlob){
       const url = URL.createObjectURL(photoBlob);
       els.status.innerHTML = `<div class="row"><img class="miniThumb" src="${url}" alt="sent photo"/><div>${msg}</div></div>`;
@@ -462,17 +456,26 @@
   function runSelfTests(){
     const results = [];
     function assert(name, cond){ results.push({ name, pass: !!cond }); }
-    // test: auth header contains base64 colon separator
+    // existing tests
     const hdr = buildAuthHeader('u','p');
     assert('Auth header prefix', hdr.startsWith('Basic '));
     assert('Auth header body length > 6', hdr.length > 6);
-    // test: photo name pattern
     const nm = derivePhotoName();
     assert('Photo name suffix .jpg', nm.endsWith('.jpg'));
     assert('Photo name includes bluemilk_', nm.startsWith('bluemilk_'));
-    // test: secure origin predicate
     assert('isSecureOrigin boolean', typeof isSecureOrigin() === 'boolean');
-    // display
+
+    // new tests
+    setStatus('Test status');
+    assert('setStatus shows overlay', els.status.className.includes('show'));
+
+    const prevBlob = photoBlob;
+    photoBlob = new Blob([new Uint8Array([0,1,2,3])], { type: 'image/png' });
+    setStatusRich('Test rich', 'ok', true);
+    assert('setStatusRich shows overlay', els.status.className.includes('show'));
+    assert('setStatusRich inserts miniThumb', els.status.innerHTML.includes('miniThumb'));
+    photoBlob = prevBlob;
+
     const list = results.map(r=>`<div class="cell"><label>${r.name}</label><div>${r.pass? '✅' : '❌'}</div></div>`).join('');
     document.getElementById('diagList').innerHTML = `<div class="list">${list}</div>`;
     return results.every(r=>r.pass);
