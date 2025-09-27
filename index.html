@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>BlueMilk • Photo + QR + Upload</title>
+  <style>
+    :root{
+      --bg:#000; --chrome:#0b0b0b; --panel:#0d0d0d; --muted:#2a2a2a; --text:#f5f5f7; --sub:#bfbfc3; --accent:#0a84ff; --ok:#30d158; --warn:#ffd60a; --err:#ff453a;
+    }
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+    body{ margin:0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background:var(--bg); color:var(--text); }
+
+    /* ===== iPhone camera-like layout ===== */
+    .app{ display:grid; grid-template-rows: auto 1fr auto; min-height:100dvh; }
+    .topbar,.bottombar{ display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:linear-gradient(180deg, rgba(0,0,0,.65), rgba(0,0,0,.1)); position:relative; z-index:2; }
+    .topbar{ padding-top: calc(10px + env(safe-area-inset-top)); }
+    .bottombar{ padding-bottom: calc(12px + env(safe-area-inset-bottom)); background:linear-gradient(0deg, rgba(0,0,0,.85), rgba(0,0,0,.15)); }
+
+    .iconbtn{ appearance:none; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); color:var(--text); padding:8px 10px; border-radius:12px; display:inline-flex; align-items:center; gap:8px; font-size:14px; cursor:pointer; }
+    .iconbtn.ghost{ background:transparent; border-color:rgba(255,255,255,.18); }
+    .iconbtn:disabled{ opacity:.5; cursor:not-allowed; }
+
+    .view{ position:relative; display:grid; place-items:center; overflow:hidden; }
+    .frame{ width:min(100vw, 900px); aspect-ratio: 3/4; background:#111; border-radius:16px; overflow:hidden; border:1px solid #1a1a1a; position:relative; }
+    /* iPhone camera feel: full-bleed video within a rounded frame */
+    video.preview{ width:100%; height:100%; object-fit:cover; display:block; background:#000; }
+    .gridlines{ position:absolute; inset:0; background:
+      linear-gradient(90deg, transparent 32%, rgba(255,255,255,.08) 33%, rgba(255,255,255,.08) 34%, transparent 35%, transparent 65%, rgba(255,255,255,.08) 66%, rgba(255,255,255,.08) 67%, transparent 68%),
+      linear-gradient(0deg,  transparent 32%, rgba(255,255,255,.08) 33%, rgba(255,255,255,.08) 34%, transparent 35%, transparent 65%, rgba(255,255,255,.08) 66%, rgba(255,255,255,.08) 67%, transparent 68%);
+      pointer-events:none;
+    }
+    .hud{ position:absolute; inset:0; display:flex; flex-direction:column; justify-content:space-between; padding:10px; }
+    .hud .toprow, .hud .bottomrow{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+
+    .chip{ background:rgba(17,17,17,.7); border:1px solid rgba(255,255,255,.12); padding:6px 10px; border-radius:999px; font-size:12px; color:#e9e9ee; }
+
+    .shutterbar{ display:flex; align-items:center; justify-content:center; gap:18px; }
+    .thumb{ width:48px; height:48px; border-radius:8px; background:#222; border:1px solid #333; object-fit:cover; }
+    .shutter{ width:74px; height:74px; border-radius:50%; background:#fff; border:6px solid rgba(255,255,255,.35); cursor:pointer; box-shadow:0 0 0 2px rgba(255,255,255,.12) inset; }
+    .shutter:active{ transform:scale(.98); }
+
+    .status{ font-size:13px; padding:10px 12px; border-radius:12px; border:1px dashed #2f2f2f; color:#d8d8dd; background:rgba(20,20,20,.6); margin:10px 14px; }
+    .status.ok{ border-color:#1f7a3a; color:#d7ffe7; background:#0f2218; }
+    .status.err{ border-color:#7a1f1f; color:#ffd9d9; background:#240e12; }
+    .status.warn{ border-color:#7a6a1f; color:#fff6d5; background:#241e0e; }
+
+    .hidden{ display:none !important; }
+
+    /* ===== Settings sheet: mobile list style ===== */
+    .sheet{ position:fixed; inset:0; display:none; background:rgba(0,0,0,.6); z-index:30; }
+    .sheet.active{ display:block; }
+    .sheet .panel{ position:absolute; inset:auto 0 0 0; border-top-left-radius:18px; border-top-right-radius:18px; background:var(--panel); border-top:1px solid #1e1e1e; padding-bottom:env(safe-area-inset-bottom); }
+    .grab{ width:40px; height:5px; border-radius:999px; background:#3a3a3a; margin:10px auto 4px; }
+    .panel h3{ margin:6px 16px 10px; font-size:14px; color:#cfcfd6; font-weight:600; }
+    .list{ background:#111; border-top:1px solid #1a1a1a; border-bottom:1px solid #1a1a1a; margin:8px 0; }
+    .cell{ display:flex; align-items:center; gap:12px; padding:12px 16px; border-top:1px solid #1a1a1a; }
+    .cell:first-child{ border-top:none; }
+    .cell label{ flex:0 0 160px; font-size:14px; color:#c9c9cf; }
+    .cell input{ flex:1; background:#0b0b0b; border:1px solid #1f1f1f; color:var(--text); border-radius:10px; padding:10px 12px; font-size:14px; }
+    .cell .toggle{ appearance:none; width:46px; height:28px; border-radius:999px; background:#333; position:relative; outline:none; cursor:pointer; border:1px solid #444; }
+    .cell .toggle:checked{ background:var(--accent); border-color:#0b5ed7; }
+    .cell .toggle::after{ content:""; position:absolute; top:2px; left:2px; width:24px; height:24px; border-radius:50%; background:#fff; transition:transform .18s ease; }
+    .cell .toggle:checked::after{ transform:translateX(18px); }
+    .panel .actions{ display:flex; gap:8px; padding:12px 16px 16px; }
+    .btn{ display:inline-flex; align-items:center; gap:8px; padding:10px 12px; border-radius:12px; background:#1a1a1a; color:var(--text); border:1px solid #2a2a2a; cursor:pointer; user-select:none; text-decoration:none; font-size:14px; }
+    .btn.primary{ background:linear-gradient(180deg,#2b77ff,#0a51ff); border-color:#1649ff; }
+
+    /* QR overlay */
+    .overlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.92); z-index:40; }
+    .overlay.active{ display:flex; }
+    .overlay .inner{ width:min(720px,92vw); padding:12px; }
+    .overlay .inner h3{ margin:0 0 8px; font-size:16px; }
+
+    /* Misc */
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .pill{ background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); padding:4px 8px; border-radius:999px; font-size:12px; color:#d8d8de; }
+    .row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Top bar like iOS camera: left settings, center info, right flip -->
+    <div class="topbar">
+      <button id="openSettings" class="iconbtn" title="Settings">⚙️ Settings</button>
+      <div class="pill" id="secureBadge">Checking security…</div>
+      <button id="flipCam" class="iconbtn" title="Switch camera" disabled>🔄 Flip</button>
+    </div>
+
+    <!-- Camera frame -->
+    <div class="view">
+      <div class="frame" id="cameraFrame">
+        <video id="video" class="preview" playsinline muted></video>
+        <div class="gridlines" aria-hidden="true"></div>
+        <div class="hud">
+          <div class="toprow">
+            <span class="chip" id="permBadge">Camera permission: unknown</span>
+            <span class="chip" id="locChip">Location: <span id="locationValue">—</span></span>
+          </div>
+          <div class="bottomrow row">
+            <input id="location" class="pill mono" placeholder="Scan QR or type storage/area" />
+            <button id="scanQrBtn" class="iconbtn" type="button">📷 Scan QR</button>
+            <label class="iconbtn" for="filePick">🖼️ Pick</label>
+            <input id="filePick" type="file" accept="image/*" capture="environment" hidden />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom bar with shutter and actions -->
+    <div class="bottombar">
+      <img id="thumb" class="thumb" alt="thumbnail" />
+      <button id="shutter" class="shutter" title="Take photo"></button>
+      <div class="row">
+        <button id="startCam" class="iconbtn" type="button">Enable camera</button>
+        <button id="upload" class="iconbtn" type="button" disabled>Upload</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status line -->
+  <div id="status" class="status">Ready.</div>
+
+  <!-- Settings sheet -->
+  <div id="settingsSheet" class="sheet" role="dialog" aria-modal="true">
+    <div class="panel">
+      <div class="grab"></div>
+      <h3>BlueMilk Settings</h3>
+      <div class="list">
+        <div class="cell"><label for="endpoint">Endpoint URL</label><input id="endpoint" type="url" placeholder="https://api.example.com/upload" autocomplete="url"></div>
+        <div class="cell"><label for="username">Username</label><input id="username" type="text" placeholder="api-user" autocomplete="username"></div>
+        <div class="cell"><label for="password">Password</label><input id="password" type="password" placeholder="••••••••" autocomplete="current-password"></div>
+        <div class="cell"><label for="locationFieldName">Field for location</label><input id="locationFieldName" type="text" value="location"></div>
+        <div class="cell"><label for="remember">Remember on this device</label><input id="remember" class="toggle" type="checkbox" checked></div>
+      </div>
+      <h3>Diagnostics</h3>
+      <div class="list" id="diagList"></div>
+      <div class="actions">
+        <button id="runDiag" class="btn">Run diagnostics</button>
+        <button id="saveSettings" class="btn primary">Save</button>
+        <button id="closeSettings" class="btn">Close</button>
+        <button id="resetSettings" class="btn">Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden canvas and preview image for capture -->
+  <canvas id="canvas" class="hidden"></canvas>
+  <img id="preview" class="hidden" alt="preview" />
+
+  <!-- QR Scanner Overlay -->
+  <div class="overlay" id="qrOverlay" role="dialog" aria-modal="true">
+    <div class="inner">
+      <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <h3>Scan QR code</h3>
+        <button class="iconbtn" id="closeQr" type="button">Close</button>
+      </div>
+      <video id="qrVideo" playsinline muted class="preview" style="border-radius:12px; border:1px solid #1a1a1a;"></video>
+      <p class="pill" style="margin-top:8px; display:inline-block;">Hold the QR 10–30 cm from camera. Value is filled automatically.</p>
+    </div>
+  </div>
+
+  <script>
+  // ===== storage utils =====
+  const store = {
+    key: 'bluemilk:v1',
+    read(){ try{ return JSON.parse(localStorage.getItem(this.key)) || {}; }catch{return{};} },
+    write(obj){ localStorage.setItem(this.key, JSON.stringify(obj)); },
+    clear(){ localStorage.removeItem(this.key); }
+  };
+  // migrate legacy ChemSnap keys if present
+  function migrateFromLegacy(){
+    try{
+      const existing = localStorage.getItem(store.key);
+      if(existing) return; // already migrated
+      const legacyKeys = ['chemsnap:v2','chemsnap:v1','chemsnap:v0'];
+      for(const k of legacyKeys){
+        const v = localStorage.getItem(k);
+        if(v){ localStorage.setItem(store.key, v); break; }
+      }
+    }catch{}
+  }
+
+  // ===== elements =====
+  const els = {
+    video: document.getElementById('video'),
+    canvas: document.getElementById('canvas'),
+    preview: document.getElementById('preview'),
+    shutter: document.getElementById('shutter'),
+    startCam: document.getElementById('startCam'),
+    upload: document.getElementById('upload'),
+    flipCam: document.getElementById('flipCam'),
+    thumb: document.getElementById('thumb'),
+
+    endpoint: document.getElementById('endpoint'),
+    username: document.getElementById('username'),
+    password: document.getElementById('password'),
+    locationFieldName: document.getElementById('locationFieldName'),
+    remember: document.getElementById('remember'),
+
+    settingsSheet: document.getElementById('settingsSheet'),
+    openSettings: document.getElementById('openSettings'),
+    saveSettings: document.getElementById('saveSettings'),
+    closeSettings: document.getElementById('closeSettings'),
+    resetSettings: document.getElementById('resetSettings'),
+
+    status: document.getElementById('status'),
+    secureBadge: document.getElementById('secureBadge'),
+    permBadge: document.getElementById('permBadge'),
+
+    location: document.getElementById('location'),
+    locationValue: document.getElementById('locationValue'),
+
+    scanQrBtn: document.getElementById('scanQrBtn'),
+    qrOverlay: document.getElementById('qrOverlay'),
+    qrVideo: document.getElementById('qrVideo'),
+    closeQr: document.getElementById('closeQr'),
+
+    runDiag: document.getElementById('runDiag'),
+    diagList: document.getElementById('diagList'),
+    filePick: document.getElementById('filePick'),
+  };
+
+  // ===== state =====
+  let mediaStream = null;
+  let facing = 'environment';
+  let photoBlob = null;
+  let photoName = null;
+  let qrStream = null;
+  let scanning = false;
+
+  // ===== helpers =====
+  const setStatus = (msg, cls='') => { els.status.className = `status ${cls}`; els.status.textContent = msg; };
+  const b64 = s => btoa(unescape(encodeURIComponent(s)));
+  const buildAuthHeader = (u,p) => 'Basic ' + b64(`${u||''}:${p||''}`);
+  const nowIso = () => new Date().toISOString();
+  function derivePhotoName(){
+    const ts = nowIso().replaceAll(':','').replaceAll('-','').replace('T','_').replace('Z','');
+    return `bluemilk_${ts}.jpg`;
+  }
+  function isSecureOrigin(){
+    return location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  }
+  function updateThumbFromBlob(blob){ if(!blob){ els.thumb.src=''; return; } els.thumb.src = URL.createObjectURL(blob); }
+  function updateLocationChip(){ els.locationValue.textContent = (els.location.value||'—'); }
+  function hasUploadSettings(){ return (els.endpoint.value?.length>7) && (els.username.value?.length>0); }
+  function updateUploadButton(){ els.upload.disabled = !photoBlob || !hasUploadSettings(); }
+
+  // ===== permissions & diagnostics =====
+  async function refreshPermissionBadge(){
+    let txt = 'unknown';
+    try{
+      if(navigator.permissions && navigator.permissions.query){
+        const q = await navigator.permissions.query({ name: 'camera' });
+        txt = q.state; // 'granted' | 'denied' | 'prompt'
+      } else {
+        txt = 'n/a';
+      }
+    }catch{ txt = 'n/a'; }
+    els.permBadge.textContent = `Camera permission: ${txt}`;
+  }
+
+  function setSecureBadge(){
+    els.secureBadge.textContent = isSecureOrigin() ? 'Secure context ✓' : 'Needs HTTPS or localhost';
+    els.secureBadge.className = 'pill';
+  }
+
+  async function runDiagnostics(){
+    const rows = [];
+    const push = (label, pass, note='') => rows.push(`<div class="cell"><label>${label}</label><div>${pass? '✅' : '❌'} <span class="mono">${note}</span></div></div>`);
+    push('Secure origin', isSecureOrigin(), location.protocol + '//' + location.host);
+    push('mediaDevices', !!navigator.mediaDevices);
+    push('getUserMedia', !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia));
+    try{
+      const devs = await navigator.mediaDevices.enumerateDevices();
+      const cams = devs.filter(d=>d.kind==='videoinput');
+      push('Cameras found', cams.length>0, `${cams.length}`);
+    }catch(e){ push('enumerateDevices', false, e.message); }
+    try{
+      if(navigator.permissions && navigator.permissions.query){
+        const q = await navigator.permissions.query({ name: 'camera' });
+        push('Permission API', true, q.state);
+      } else { push('Permission API', false, 'not available'); }
+    }catch(e){ push('Permission API', false, e.message); }
+    els.diagList.innerHTML = `<div class="list">${rows.join('')}</div>`;
+  }
+
+  // ===== camera =====
+  async function startCamera(){
+    if(!isSecureOrigin()){
+      setStatus('Camera blocked: page must be served over HTTPS or on localhost.', 'err');
+      return;
+    }
+    try{
+      const constraints = { video: { facingMode: { ideal: facing }, width:{ ideal:1920 }, height:{ ideal:1080 } }, audio:false };
+      mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      els.video.srcObject = mediaStream;
+      await els.video.play();
+      els.flipCam.disabled = false;
+      setStatus('Camera active.', '');
+      await refreshPermissionBadge();
+    } catch (err){
+      console.error(err);
+      if(err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError'){
+        setStatus('Permission denied. Allow camera in site settings and try again.', 'err');
+      } else if(err.name === 'NotFoundError'){
+        setStatus('No camera found on this device.', 'err');
+      } else if(err.name === 'OverconstrainedError'){
+        setStatus('Requested camera constraints not satisfied. Trying default…', 'warn');
+        try{
+          const stream = await navigator.mediaDevices.getUserMedia({ video:true, audio:false });
+          mediaStream = stream; els.video.srcObject = stream; await els.video.play();
+        }catch(e2){ setStatus('Camera failed with default constraints: '+ e2.message, 'err'); }
+      } else {
+        setStatus('Camera error: ' + err.message, 'err');
+      }
+    }
+  }
+
+  function stopCamera(){ if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream = null; } els.flipCam.disabled = true; }
+
+  async function flipCamera(){
+    facing = (facing === 'environment') ? 'user' : 'environment';
+    if(!mediaStream) return startCamera();
+    const [track] = mediaStream.getVideoTracks();
+    if(track && track.applyConstraints){
+      try{ await track.applyConstraints({ facingMode: facing }); return; }catch{}
+    }
+    stopCamera();
+    startCamera();
+  }
+
+  function captureFrameToBlob(){
+    const v = els.video; const c = els.canvas;
+    const ratio = v.videoWidth / v.videoHeight || 4/3;
+    const maxW = Math.min(2048, v.videoWidth || 1600);
+    const w = maxW; const h = Math.round(w / ratio);
+    c.width = w; c.height = h;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(v, 0, 0, w, h);
+    return new Promise(resolve => c.toBlob(b => resolve(b), 'image/jpeg', 0.92));
+  }
+
+  async function takePhoto(){
+    if(!mediaStream){ setStatus('Camera is not active.', 'warn'); return; }
+    setStatus('Capturing…');
+    photoBlob = await captureFrameToBlob();
+    photoName = derivePhotoName();
+    updateThumbFromBlob(photoBlob);
+    els.preview.src = URL.createObjectURL(photoBlob);
+    updateUploadButton();
+    setStatus(`Photo captured: ${photoName}`, 'ok');
+  }
+
+  // ===== upload =====
+  async function upload(){
+    if(!photoBlob){ setStatus('No photo to upload.', 'warn'); return; }
+    const endpoint = (els.endpoint.value||'').trim();
+    if(!endpoint){ setStatus('Endpoint is required.', 'err'); return; }
+
+    const form = new FormData();
+    form.append('image', photoBlob, photoName || 'image.jpg');
+    const locationField = (els.locationFieldName.value||'location').trim();
+    form.append(locationField, (els.location.value||'').trim());
+    form.append('clientTime', nowIso());
+    form.append('app', 'BlueMilk-1.0');
+
+    els.upload.disabled = true;
+    setStatus('Uploading…');
+    try{
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Authorization': buildAuthHeader(els.username.value, els.password.value) },
+        body: form,
+        mode: 'cors',
+        redirect: 'follow'
+      });
+      const text = await res.text().catch(()=> '');
+      if(res.ok){ setStatus('Upload successful. Response: ' + (text.slice(0,240) || res.statusText), 'ok'); }
+      else { setStatus(`Server error (${res.status}): ` + (text.slice(0,240) || res.statusText), 'err'); }
+    }catch(err){ setStatus('Network error: ' + err.message, 'err'); }
+    finally{ els.upload.disabled = false; }
+  }
+
+  // ===== QR scan =====
+  async function startQrScan(){
+    els.qrOverlay.classList.add('active');
+    scanning = true;
+    try{
+      qrStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio:false });
+      els.qrVideo.srcObject = qrStream; await els.qrVideo.play();
+      scanLoop();
+    }catch(err){ setStatus('QR scanner failed: ' + err.message, 'err'); stopQrScan(); }
+  }
+  function stopQrScan(){ scanning = false; els.qrOverlay.classList.remove('active'); if(qrStream){ qrStream.getTracks().forEach(t=>t.stop()); qrStream=null; } }
+
+  async function scanLoop(){
+    if(typeof window.jsQR !== 'function'){ setStatus('QR library not loaded.', 'err'); return; }
+    const v = els.qrVideo; const c = document.createElement('canvas'); const ctx = c.getContext('2d', { willReadFrequently: true });
+    while(scanning){
+      if(v.readyState >= 2){
+        c.width = v.videoWidth; c.height = v.videoHeight; ctx.drawImage(v, 0, 0, c.width, c.height);
+        const img = ctx.getImageData(0,0,c.width,c.height);
+        const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+        if(code && code.data){ els.location.value = code.data.trim(); updateLocationChip(); setStatus('QR captured: ' + els.location.value, 'ok'); stopQrScan(); break; }
+      }
+      await new Promise(r=>setTimeout(r,120));
+    }
+  }
+
+  // ===== settings =====
+  function loadSettings(){
+    const s = store.read();
+    if(s.endpoint) els.endpoint.value = s.endpoint;
+    if(s.username) els.username.value = s.username;
+    if(s.password) els.password.value = s.password;
+    if(s.locationFieldName) els.locationFieldName.value = s.locationFieldName;
+    if(typeof s.remember === 'boolean') els.remember.checked = s.remember; else els.remember.checked = true;
+    updateUploadButton();
+  }
+  function saveSettings(){
+    const payload = {
+      endpoint: (els.endpoint.value||'').trim(),
+      username: els.username.value||'',
+      password: els.password.value||'',
+      locationFieldName: (els.locationFieldName.value||'location').trim(),
+      remember: !!els.remember.checked
+    };
+    if(payload.remember){ store.write(payload); } else { store.clear(); }
+    setStatus('Settings saved.', 'ok');
+    updateUploadButton();
+  }
+
+  // ===== events =====
+  els.openSettings.addEventListener('click', ()=> els.settingsSheet.classList.add('active'));
+  els.closeSettings.addEventListener('click', ()=> els.settingsSheet.classList.remove('active'));
+  els.resetSettings.addEventListener('click', ()=> { store.clear(); loadSettings(); setStatus('Settings reset.', 'warn'); });
+  els.saveSettings.addEventListener('click', ()=>{ saveSettings(); els.settingsSheet.classList.remove('active'); });
+  els.runDiag.addEventListener('click', runDiagnostics);
+
+  els.startCam.addEventListener('click', startCamera);
+  els.shutter.addEventListener('click', takePhoto);
+  els.upload.addEventListener('click', upload);
+  els.flipCam.addEventListener('click', flipCamera);
+  els.location.addEventListener('input', updateLocationChip);
+
+  els.scanQrBtn.addEventListener('click', startQrScan);
+  els.closeQr.addEventListener('click', stopQrScan);
+
+  els.filePick.addEventListener('change', ev => {
+    const f = ev.target.files?.[0]; if(!f) return; photoBlob = f; photoName = f.name || derivePhotoName(); updateThumbFromBlob(photoBlob); updateUploadButton(); setStatus(`Picked: ${photoName}`, 'ok');
+  });
+
+  // ===== self-tests (lightweight) =====
+  function runSelfTests(){
+    const results = [];
+    function assert(name, cond){ results.push({ name, pass: !!cond }); }
+    // test: auth header contains base64 colon separator
+    const hdr = buildAuthHeader('u','p');
+    assert('Auth header prefix', hdr.startsWith('Basic '));
+    assert('Auth header body length > 6', hdr.length > 6);
+    // test: photo name pattern
+    const nm = derivePhotoName();
+    assert('Photo name suffix .jpg', nm.endsWith('.jpg'));
+    assert('Photo name includes bluemilk_', nm.startsWith('bluemilk_'));
+    // test: secure origin predicate
+    assert('isSecureOrigin boolean', typeof isSecureOrigin() === 'boolean');
+    // display
+    const list = results.map(r=>`<div class="cell"><label>${r.name}</label><div>${r.pass? '✅' : '❌'}</div></div>`).join('');
+    els.diagList.innerHTML = `<div class="list">${list}</div>`;
+    return results.every(r=>r.pass);
+  }
+
+  // ===== init =====
+  (function init(){
+    migrateFromLegacy();
+    setSecureBadge();
+    refreshPermissionBadge();
+    loadSettings();
+    updateLocationChip();
+    runSelfTests();
+  })();
+
+  window.addEventListener('beforeunload', () => { stopCamera(); stopQrScan(); });
+  </script>
+
+  <!-- QR decoder -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" crossorigin="anonymous"></script>
+  <noscript>This app requires JavaScript.</noscript>
+</body>
+</html>
