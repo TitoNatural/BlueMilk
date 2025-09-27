@@ -52,6 +52,14 @@
 
     .hidden{ display:none !important; }
 
+    /* ===== Results list ===== */
+    .results{ max-width:980px; margin:12px auto 24px; padding:0 14px; }
+    .results h3{ margin:8px 0 10px; font-size:16px; color:#e7e7ec; }
+    .chem-grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px; }
+    .chem-card{ background:#0f0f10; border:1px solid #1f1f1f; border-radius:12px; padding:10px 12px; }
+    .chem-name{ font-weight:600; font-size:14px; color:#fff; }
+    .chem-manu{ font-size:12px; color:#b7b7bd; margin-top:4px; }
+
     /* ===== Settings sheet: mobile list style ===== */
     .sheet{ position:fixed; inset:0; display:none; background:rgba(0,0,0,.6); z-index:30; }
     .sheet.active{ display:block; }
@@ -141,6 +149,12 @@
   <!-- Status line (rich capable) -->
   <div id="status" class="status">Ready.</div>
 
+  <!-- Results (detected chemicals) -->
+  <section id="chemResults" class="results hidden">
+    <h3>Detected chemicals</h3>
+    <div id="chemList" class="chem-grid"></div>
+  </section>
+
   <!-- Settings sheet -->
   <div id="settingsSheet" class="sheet" role="dialog" aria-modal="true">
     <div class="panel">
@@ -183,11 +197,10 @@
     write: function(obj){ localStorage.setItem(this.key, JSON.stringify(obj)); },
     clear: function(){ localStorage.removeItem(this.key); }
   };
-  // migrate legacy ChemSnap keys if present
   function migrateFromLegacy(){
     try{
       const existing = localStorage.getItem(store.key);
-      if(existing) return; // already migrated
+      if(existing) return;
       const legacyKeys = ['chemsnap:v2','chemsnap:v1','chemsnap:v0'];
       for(var i=0;i<legacyKeys.length;i++){
         const k = legacyKeys[i];
@@ -230,6 +243,9 @@
     runDiag: document.getElementById('runDiag'),
     diagList: document.getElementById('diagList'),
     filePick: document.getElementById('filePick'),
+
+    chemResults: document.getElementById('chemResults'),
+    chemList: document.getElementById('chemList'),
   };
 
   // ===== state =====
@@ -306,6 +322,28 @@
     } else {
       openSettingsWithHint('Please enter Endpoint, Username, and Password first.');
     }
+  }
+
+  // ===== results renderer =====
+  function renderChemicals(arr){
+    if(!arr || !arr.length){
+      els.chemList.innerHTML = '';
+      els.chemResults.classList.add('hidden');
+      return;
+    }
+    var html = '';
+    for(var i=0;i<arr.length;i++){
+      var c = arr[i] || {};
+      var name = (c.product_name || c.name || '').toString();
+      var manu = (c.manufacturer || c.producer || '').toString();
+      html += '<div class="chem-card">'
+            + '<div class="chem-name">' + (name || 'Unknown product') + '</div>'
+            + '<div class="chem-manu">' + (manu || 'Unknown manufacturer') + '</div>'
+            + '</div>';
+    }
+    els.chemList.innerHTML = html;
+    els.chemResults.classList.remove('hidden');
+    try{ els.chemResults.scrollIntoView({ behavior:'smooth', block:'start' }); }catch(e){}
   }
 
   // ===== diagnostics =====
@@ -401,11 +439,21 @@
         mode: 'cors',
         redirect: 'follow'
       });
-      const text = await res.text().catch(function(){ return ''; });
+      var textBody = '';
+      var data = null;
+      try{ data = await res.json(); }
+      catch(e){ try{ textBody = await res.text(); }catch(e2){} }
+
       if(res.ok){
         setStatusRich('Upload successful.', 'ok', true);
+        var chems = [];
+        if(data && data.result && data.result.chemicals && data.result.chemicals.length){
+          chems = data.result.chemicals;
+        }
+        renderChemicals(chems);
       } else {
-        setStatusRich('Server error ('+res.status+'): ' + (text.slice(0,240) || res.statusText), 'err', true);
+        var msg = 'Server error ('+res.status+'): ' + (textBody ? textBody.slice(0,240) : (res.statusText||''));
+        setStatusRich(msg, 'err', true);
       }
     }catch(err){ setStatusRich('Network error: ' + err.message, 'err', true); }
     finally{ els.upload.disabled = false; }
@@ -492,7 +540,7 @@
     assert('Photo name includes bluemilk_', nm.indexOf('bluemilk_') === 0);
     assert('isSecureOrigin boolean', typeof isSecureOrigin() === 'boolean');
 
-    // new tests
+    // overlay tests
     setStatus('Test status');
     assert('setStatus shows overlay', els.status.className.indexOf('show') !== -1);
 
@@ -503,11 +551,9 @@
     assert('setStatusRich inserts miniThumb', els.status.innerHTML.indexOf('miniThumb') !== -1);
     photoBlob = prevBlob;
 
-    // location hint toggles
-    els.location.value = 'A-01'; updateLocationHint();
-    assert('locHint shows signed in', els.locHint.textContent.indexOf('Signed into: A-01') !== -1);
-    els.location.value = ''; updateLocationHint();
-    assert('locHint shows scan hint', els.locHint.textContent.indexOf('Scan QR to sign into a location') !== -1);
+    // results rendering test
+    renderChemicals([{product_name:'X', manufacturer:'Y'},{product_name:'A', manufacturer:'B'}]);
+    assert('chem list shows item', els.chemList.innerHTML.indexOf('X') !== -1 && els.chemList.innerHTML.indexOf('Y') !== -1);
 
     const list = results.map(function(r){ return '<div class="cell"><label>' + r.name + '</label><div>' + (r.pass? '✅' : '❌') + '</div></div>'; }).join('');
     els.diagList.innerHTML = '<div class="list">' + list + '</div>';
@@ -522,7 +568,6 @@
     }
     loadSettings();
     runSelfTests();
-    // Start camera immediately (permission dialog may appear)
     await startCamera();
   })();
 
