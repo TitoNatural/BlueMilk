@@ -329,14 +329,11 @@
     try{
       if(!data) return [];
       if(Array.isArray(data)) return data;
-      if(Array.isArray(data.result)) return data.result;
-      if(data.result && Array.isArray(data.result.chemicals)) return data.result.chemicals;
+      if(data && Array.isArray(data.result)) return data.result;
+      if(data && data.result && Array.isArray(data.result.chemicals)) return data.result.chemicals;
       if(Array.isArray(data.chemicals)) return data.chemicals;
       return [];
     }catch(e){ return []; }
-  } else {
-      openSettingsWithHint('Please enter Endpoint, Username, and Password first.');
-    }
   }
 
   // ===== results renderer =====
@@ -464,7 +461,6 @@
         var chems = parseChemicals(data);
         renderChemicals(chems);
       } else {
-      } else {
         var msg = 'Server error ('+res.status+'): ' + (textBody ? textBody.slice(0,240) : (res.statusText||''));
         setStatusRich(msg, 'err', true);
       }
@@ -566,6 +562,16 @@
 
     // results should be hidden on init (no demo data rendered)
     assert('chem list hidden on init', els.chemResults.classList.contains('hidden'));
+
+    // parseChemicals shape tests (no DOM rendering)
+    var t1 = parseChemicals({result:[{product_name:'P',manufacturer:'M'}]});
+    assert('parseChemicals result[]=array', Array.isArray(t1) && t1.length===1);
+    var t2 = parseChemicals({result:{chemicals:[{product_name:'Q',manufacturer:'N'}]}});
+    assert('parseChemicals result.chemicals', Array.isArray(t2) && t2.length===1);
+    var t3 = parseChemicals({chemicals:[{product_name:'R',manufacturer:''}]});
+    assert('parseChemicals chemicals at root', Array.isArray(t3) && t3.length===1);
+    var t4 = parseChemicals({});
+    assert('parseChemicals empty -> []', Array.isArray(t4) && t4.length===0);
 
     const list = results.map(function(r){ return '<div class="cell"><label>' + r.name + '</label><div>' + (r.pass? '✅' : '❌') + '</div></div>'; }).join('');
     els.diagList.innerHTML = '<div class="list">' + list + '</div>';
