@@ -504,7 +504,7 @@
     photoBlob = prevBlob;
 
     const list = results.map(r=>`<div class="cell"><label>${r.name}</label><div>${r.pass? '✅' : '❌'}</div></div>`).join('');
-    document.getElementById('diagList').innerHTML = `<div class="list">${list}</div>`;
+    els.diagList.innerHTML = '<div class="list">' + list + '</div>';
     return results.every(r=>r.pass);
   }
 
