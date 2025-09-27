@@ -551,9 +551,8 @@
     assert('setStatusRich inserts miniThumb', els.status.innerHTML.indexOf('miniThumb') !== -1);
     photoBlob = prevBlob;
 
-    // results rendering test
-    renderChemicals([{product_name:'X', manufacturer:'Y'},{product_name:'A', manufacturer:'B'}]);
-    assert('chem list shows item', els.chemList.innerHTML.indexOf('X') !== -1 && els.chemList.innerHTML.indexOf('Y') !== -1);
+    // results should be hidden on init (no demo data rendered)
+    assert('chem list hidden on init', els.chemResults.classList.contains('hidden'));
 
     const list = results.map(function(r){ return '<div class="cell"><label>' + r.name + '</label><div>' + (r.pass? '✅' : '❌') + '</div></div>'; }).join('');
     els.diagList.innerHTML = '<div class="list">' + list + '</div>';
@@ -567,6 +566,8 @@
       setStatus('Use HTTPS or localhost for camera access.', 'warn');
     }
     loadSettings();
+    // ensure results are hidden at start
+    renderChemicals([]);
     runSelfTests();
     await startCamera();
   })();
@@ -576,6 +577,6 @@
 
   <!-- QR decoder -->
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" crossorigin="anonymous"></script>
-  <noscript>This app requires JavaScript and is a test.</noscript>
+  <noscript>This app requires JavaScript.</noscript>
 </body>
 </html>
