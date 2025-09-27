@@ -45,6 +45,8 @@
     .status.ok{ border-color:#1f7a3a; color:#d7ffe7; background:#0f2218; }
     .status.err{ border-color:#7a1f1f; color:#ffd9d9; background:#240e12; }
     .status.warn{ border-color:#7a6a1f; color:#fff6d5; background:#241e0e; }
+    .status .row{ display:flex; align-items:center; gap:10px; }
+    .status .miniThumb{ width:48px; height:48px; object-fit:cover; border-radius:8px; border:1px solid #333; background:#111; }
 
     .hidden{ display:none !important; }
 
@@ -71,21 +73,21 @@
     .overlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.92); z-index:40; }
     .overlay.active{ display:flex; }
     .overlay .inner{ width:min(720px,92vw); padding:12px; }
-    .overlay .inner h3{ margin:0 0 8px; font-size:16px; }
 
     /* Misc */
     .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
     .pill{ background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); padding:4px 8px; border-radius:999px; font-size:12px; color:#d8d8de; }
     .row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .icon{ width:20px; height:20px; display:block; }
   </style>
 </head>
 <body>
   <div class="app">
-    <!-- Top bar: left settings, center secure badge, right flip -->
+    <!-- Top bar: only settings (removed security & flip) -->
     <div class="topbar">
       <button id="openSettings" class="iconbtn" title="Settings">⚙️ Settings</button>
-      <div class="pill" id="secureBadge">Checking security…</div>
-      <button id="flipCam" class="iconbtn" title="Switch camera" disabled>🔄 Flip</button>
+      <div></div>
+      <div></div>
     </div>
 
     <!-- Camera frame -->
@@ -99,9 +101,24 @@
           </div>
           <div class="bottomrow row">
             <input id="location" class="pill mono" placeholder="Scan QR or type storage/area" />
-            <button id="scanQrBtn" class="iconbtn" type="button">🔳 Location</button>
-            <label class="iconbtn" for="filePick">📸 Camera</label>
-            <input id="filePick" type="file" accept="image/*" capture="environment" hidden />
+            <button id="scanQrBtn" class="iconbtn" type="button" aria-label="QR">
+              <!-- Simple QR icon (universal, inline SVG) -->
+              <svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3" y="3" width="6" height="6" stroke="currentColor" stroke-width="2"/>
+                <rect x="15" y="3" width="6" height="6" stroke="currentColor" stroke-width="2"/>
+                <rect x="3" y="15" width="6" height="6" stroke="currentColor" stroke-width="2"/>
+                <path d="M15 15h3v3h-3zM18 18h3v3h-3zM18 15h3v-3" stroke="currentColor" stroke-width="2"/>
+              </svg>
+            </button>
+            <label class="iconbtn" for="filePick" aria-label="Photos">
+              <!-- Simple photo icon (universal, inline SVG) -->
+              <svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3" y="5" width="18" height="14" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+                <circle cx="9" cy="11" r="2" stroke="currentColor" stroke-width="2"/>
+                <path d="M21 17l-5-5-4 4-2-2-5 5" stroke="currentColor" stroke-width="2"/>
+              </svg>
+            </label>
+            <input id="filePick" type="file" accept="image/*" hidden />
           </div>
         </div>
       </div>
@@ -117,7 +134,7 @@
     </div>
   </div>
 
-  <!-- Status line -->
+  <!-- Status line (rich capable) -->
   <div id="status" class="status">Ready.</div>
 
   <!-- Settings sheet -->
@@ -147,15 +164,10 @@
   <canvas id="canvas" class="hidden"></canvas>
   <img id="preview" class="hidden" alt="preview" />
 
-  <!-- QR Scanner Overlay -->
+  <!-- QR Scanner Overlay (title removed) -->
   <div class="overlay" id="qrOverlay" role="dialog" aria-modal="true">
     <div class="inner">
-      <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <h3>Scan QR code</h3>
-        <button class="iconbtn" id="closeQr" type="button">Close</button>
-      </div>
       <video id="qrVideo" playsinline muted class="preview" style="border-radius:12px; border:1px solid #1a1a1a;"></video>
-      <p class="pill" style="margin-top:8px; display:inline-block;">Hold the QR 10–30 cm from camera. Value is filled automatically.</p>
     </div>
   </div>
 
@@ -187,7 +199,6 @@
     preview: document.getElementById('preview'),
     shutter: document.getElementById('shutter'),
     upload: document.getElementById('upload'),
-    flipCam: document.getElementById('flipCam'),
     thumb: document.getElementById('thumb'),
 
     endpoint: document.getElementById('endpoint'),
@@ -203,7 +214,6 @@
     resetSettings: document.getElementById('resetSettings'),
 
     status: document.getElementById('status'),
-    secureBadge: document.getElementById('secureBadge'),
 
     location: document.getElementById('location'),
     locationValue: document.getElementById('locationValue'),
@@ -228,6 +238,15 @@
 
   // ===== helpers =====
   const setStatus = (msg, cls='') => { els.status.className = `status ${cls}`; els.status.textContent = msg; };
+  function setStatusRich(msg, cls='ok', includeThumb=false){
+    els.status.className = `status ${cls}`;
+    if(includeThumb && photoBlob){
+      const url = URL.createObjectURL(photoBlob);
+      els.status.innerHTML = `<div class="row"><img class="miniThumb" src="${url}" alt="sent photo"/><div>${msg}</div></div>`;
+    } else {
+      els.status.textContent = msg;
+    }
+  }
   const b64 = s => btoa(unescape(encodeURIComponent(s)));
   const buildAuthHeader = (u,p) => 'Basic ' + b64(`${u||''}:${p||''}`);
   const nowIso = () => new Date().toISOString();
@@ -282,7 +301,6 @@
       mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
       els.video.srcObject = mediaStream;
       await els.video.play();
-      els.flipCam.disabled = false;
       setStatus('Camera active.', '');
     } catch (err){
       console.error(err);
@@ -302,18 +320,7 @@
     }
   }
 
-  function stopCamera(){ if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream = null; } els.flipCam.disabled = true; }
-
-  async function flipCamera(){
-    facing = (facing === 'environment') ? 'user' : 'environment';
-    if(!mediaStream) return startCamera();
-    const [track] = mediaStream.getVideoTracks();
-    if(track && track.applyConstraints){
-      try{ await track.applyConstraints({ facingMode: facing }); return; }catch{}
-    }
-    stopCamera();
-    startCamera();
-  }
+  function stopCamera(){ if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream = null; } }
 
   function captureFrameToBlob(){
     const v = els.video; const c = els.canvas;
@@ -362,8 +369,11 @@
         redirect: 'follow'
       });
       const text = await res.text().catch(()=> '');
-      if(res.ok){ setStatus('Upload successful. Response: ' + (text.slice(0,240) || res.statusText), 'ok'); }
-      else { setStatus(`Server error (${res.status}): ` + (text.slice(0,240) || res.statusText), 'err'); }
+      if(res.ok){
+        setStatusRich('Upload successful.', 'ok', true);
+      } else {
+        setStatus('Server error ('+res.status+'): ' + (text.slice(0,240) || res.statusText), 'err');
+      }
     }catch(err){ setStatus('Network error: ' + err.message, 'err'); }
     finally{ els.upload.disabled = false; }
   }
@@ -426,15 +436,13 @@
 
   els.shutter.addEventListener('click', takePhoto);
   els.upload.addEventListener('click', upload);
-  els.flipCam.addEventListener('click', flipCamera);
   els.location.addEventListener('input', updateLocationChip);
 
   els.scanQrBtn.addEventListener('click', startQrScan);
-  els.closeQr.addEventListener('click', stopQrScan);
 
   els.filePick.addEventListener('change', async ev => {
     const f = ev.target.files?.[0]; if(!f) return;
-    photoBlob = f; photoName = f.name || derivePhotoName(); updateThumbFromBlob(photoBlob); updateUploadButton(); setStatus(`Captured via native camera: ${photoName}`, 'ok');
+    photoBlob = f; photoName = f.name || derivePhotoName(); updateThumbFromBlob(photoBlob); updateUploadButton(); setStatus(`Selected from Photos: ${photoName}`, 'ok');
     await autoUploadOrSettings();
   });
 
