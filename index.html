@@ -363,7 +363,7 @@
     form.append('app', 'BlueMilk-1.0');
 
     els.upload.disabled = true;
-    setStatus('Uploading…');
+    setStatusRich('Uploading…', 'warn', true);
     try{
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -376,9 +376,9 @@
       if(res.ok){
         setStatusRich('Upload successful.', 'ok', true);
       } else {
-        setStatus('Server error ('+res.status+'): ' + (text.slice(0,240) || res.statusText), 'err');
+        setStatusRich('Server error ('+res.status+'): ' + (text.slice(0,240) || res.statusText), 'err', true);
       }
-    }catch(err){ setStatus('Network error: ' + err.message, 'err'); }
+    }catch(err){ setStatusRich('Network error: ' + err.message, 'err', true); }
     finally{ els.upload.disabled = false; }
   }
 
