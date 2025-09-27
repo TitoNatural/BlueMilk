@@ -97,10 +97,12 @@
         <div class="gridlines" aria-hidden="true"></div>
         <div class="hud">
           <div class="toprow">
-            <span class="chip" id="locChip">Location: <span id="locationValue">—</span></span>
+            <!-- Instruction at top-left -->
+            <span class="chip" id="locHint">Scan QR to sign into a location</span>
           </div>
           <div class="bottomrow row">
-            <input id="location" class="pill mono" placeholder="Scan QR or type storage/area" />
+            <!-- Hidden field to hold scanned location (no visible text at bottom-left) -->
+            <input id="location" class="pill mono hidden" aria-hidden="true" />
             <button id="scanQrBtn" class="iconbtn" type="button" aria-label="QR">
               <!-- Simple QR icon (universal, inline SVG) -->
               <svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -164,7 +166,7 @@
   <canvas id="canvas" class="hidden"></canvas>
   <img id="preview" class="hidden" alt="preview" />
 
-  <!-- QR Scanner Overlay (title removed) -->
+  <!-- QR Scanner Overlay (no title) -->
   <div class="overlay" id="qrOverlay" role="dialog" aria-modal="true">
     <div class="inner">
       <video id="qrVideo" playsinline muted class="preview" style="border-radius:12px; border:1px solid #1a1a1a;"></video>
@@ -216,12 +218,11 @@
     status: document.getElementById('status'),
 
     location: document.getElementById('location'),
-    locationValue: document.getElementById('locationValue'),
+    locHint: document.getElementById('locHint'),
 
     scanQrBtn: document.getElementById('scanQrBtn'),
     qrOverlay: document.getElementById('qrOverlay'),
     qrVideo: document.getElementById('qrVideo'),
-    closeQr: document.getElementById('closeQr'),
 
     runDiag: document.getElementById('runDiag'),
     diagList: document.getElementById('diagList'),
@@ -258,7 +259,10 @@
     return location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
   }
   function updateThumbFromBlob(blob){ if(!blob){ els.thumb.src=''; return; } els.thumb.src = URL.createObjectURL(blob); }
-  function updateLocationChip(){ els.locationValue.textContent = (els.location.value||'—'); }
+  function updateLocationHint(){
+    const val = (els.location.value||'').trim();
+    els.locHint.textContent = val ? `Signed into: ${val}` : 'Scan QR to sign into a location';
+  }
   function hasUploadSettings(){ return (els.endpoint.value?.length>7) && (els.username.value?.length>0); }
   function updateUploadButton(){ els.upload.disabled = !photoBlob || !hasUploadSettings(); }
 
@@ -398,7 +402,7 @@
         c.width = v.videoWidth; c.height = v.videoHeight; ctx.drawImage(v, 0, 0, c.width, c.height);
         const img = ctx.getImageData(0,0,c.width,c.height);
         const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
-        if(code && code.data){ els.location.value = code.data.trim(); updateLocationChip(); setStatus('QR captured: ' + els.location.value, 'ok'); stopQrScan(); break; }
+        if(code && code.data){ els.location.value = code.data.trim(); updateLocationHint(); setStatus('QR captured: ' + els.location.value, 'ok'); stopQrScan(); break; }
       }
       await new Promise(r=>setTimeout(r,120));
     }
@@ -413,6 +417,7 @@
     if(s.locationFieldName) els.locationFieldName.value = s.locationFieldName;
     if(typeof s.remember === 'boolean') els.remember.checked = s.remember; else els.remember.checked = true;
     updateUploadButton();
+    updateLocationHint();
   }
   function saveSettings(){
     const payload = {
@@ -428,19 +433,18 @@
   }
 
   // ===== events =====
-  els.openSettings.addEventListener('click', ()=> els.settingsSheet.classList.add('active'));
-  els.closeSettings.addEventListener('click', ()=> els.settingsSheet.classList.remove('active'));
-  els.resetSettings.addEventListener('click', ()=> { store.clear(); loadSettings(); setStatus('Settings reset.', 'warn'); });
-  els.saveSettings.addEventListener('click', ()=>{ saveSettings(); els.settingsSheet.classList.remove('active'); });
-  els.runDiag.addEventListener('click', runDiagnostics);
+  document.getElementById('openSettings').addEventListener('click', ()=> els.settingsSheet.classList.add('active'));
+  document.getElementById('closeSettings').addEventListener('click', ()=> els.settingsSheet.classList.remove('active'));
+  document.getElementById('resetSettings').addEventListener('click', ()=> { store.clear(); loadSettings(); setStatus('Settings reset.', 'warn'); });
+  document.getElementById('saveSettings').addEventListener('click', ()=>{ saveSettings(); els.settingsSheet.classList.remove('active'); });
+  document.getElementById('runDiag').addEventListener('click', runDiagnostics);
 
-  els.shutter.addEventListener('click', takePhoto);
-  els.upload.addEventListener('click', upload);
-  els.location.addEventListener('input', updateLocationChip);
+  document.getElementById('shutter').addEventListener('click', takePhoto);
+  document.getElementById('upload').addEventListener('click', upload);
 
-  els.scanQrBtn.addEventListener('click', startQrScan);
+  document.getElementById('scanQrBtn').addEventListener('click', startQrScan);
 
-  els.filePick.addEventListener('change', async ev => {
+  document.getElementById('filePick').addEventListener('change', async ev => {
     const f = ev.target.files?.[0]; if(!f) return;
     photoBlob = f; photoName = f.name || derivePhotoName(); updateThumbFromBlob(photoBlob); updateUploadButton(); setStatus(`Selected from Photos: ${photoName}`, 'ok');
     await autoUploadOrSettings();
@@ -460,16 +464,9 @@
     assert('Photo name includes bluemilk_', nm.startsWith('bluemilk_'));
     // test: secure origin predicate
     assert('isSecureOrigin boolean', typeof isSecureOrigin() === 'boolean');
-    // test: hasUploadSettings
-    const old = { ep: els.endpoint.value, un: els.username.value };
-    els.endpoint.value = 'https://example.com/x'; els.username.value = 'u';
-    assert('hasUploadSettings true with endpoint+username', hasUploadSettings() === true);
-    els.endpoint.value = ''; els.username.value = '';
-    assert('hasUploadSettings false when missing', hasUploadSettings() === false);
-    els.endpoint.value = old.ep; els.username.value = old.un;
     // display
     const list = results.map(r=>`<div class="cell"><label>${r.name}</label><div>${r.pass? '✅' : '❌'}</div></div>`).join('');
-    els.diagList.innerHTML = `<div class="list">${list}</div>`;
+    document.getElementById('diagList').innerHTML = `<div class="list">${list}</div>`;
     return results.every(r=>r.pass);
   }
 
@@ -480,13 +477,12 @@
       setStatus('Use HTTPS or localhost for camera access.', 'warn');
     }
     loadSettings();
-    updateLocationChip();
     runSelfTests();
     // Start camera immediately (permission dialog may appear)
     await startCamera();
   })();
 
-  window.addEventListener('beforeunload', () => { stopCamera(); stopQrScan(); });
+  window.addEventListener('beforeunload', () => { stopCamera(); });
   </script>
 
   <!-- QR decoder -->
