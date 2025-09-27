@@ -238,17 +238,44 @@
   let photoName = null;
   let qrStream = null;
   let scanning = false;
+  let statusHideTimer = null;
+  let lastStatusURL = null;
 
   // ===== helpers =====
-  const setStatus = (msg, cls='') => { els.status.className = `status ${cls} show`; els.status.textContent = msg; };
+  const setStatus = (msg, cls='') => {
+    els.status.className = `status ${cls} show`;
+    els.status.textContent = msg;
+    scheduleStatusHide(cls || 'ok');
+  };
   function setStatusRich(msg, cls='ok', includeThumb=false){
     els.status.className = `status ${cls} show`;
+    if(includeThumb && photoBlob){
+      const url = URL.createObjectURL(photoBlob);
+      if(lastStatusURL && lastStatusURL !== url){ try{ URL.revokeObjectURL(lastStatusURL); }catch{} }
+      lastStatusURL = url;
+      els.status.innerHTML = `<div class="row"><img class="miniThumb" src="${url}" alt="sent photo"/><div>${msg}</div></div>`;
+    } else {
+      els.status.textContent = msg;
+    }
+    scheduleStatusHide(cls || 'ok');
+  } show`;
     if(includeThumb && photoBlob){
       const url = URL.createObjectURL(photoBlob);
       els.status.innerHTML = `<div class="row"><img class="miniThumb" src="${url}" alt="sent photo"/><div>${msg}</div></div>`;
     } else {
       els.status.textContent = msg;
     }
+  }
+  function scheduleStatusHide(kind){
+    try{ clearTimeout(statusHideTimer); }catch{}
+    let ms = 3200;
+    if(kind === 'err') ms = 6000;
+    else if(kind === 'warn') ms = 3800;
+    else if(kind === 'ok') ms = 2600;
+    statusHideTimer = setTimeout(() => {
+      els.status.classList.remove('show');
+      if(lastStatusURL){ try{ URL.revokeObjectURL(lastStatusURL); }catch{} lastStatusURL = null; }
+    }, ms);
   }
   const b64 = s => btoa(unescape(encodeURIComponent(s)));
   const buildAuthHeader = (u,p) => 'Basic ' + b64(`${u||''}:${p||''}`);
