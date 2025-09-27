@@ -324,6 +324,21 @@
     }
   }
 
+  // ===== parse helper for chemicals =====
+  function parseChemicals(data){
+    try{
+      if(!data) return [];
+      if(Array.isArray(data)) return data;
+      if(Array.isArray(data.result)) return data.result;
+      if(data.result && Array.isArray(data.result.chemicals)) return data.result.chemicals;
+      if(Array.isArray(data.chemicals)) return data.chemicals;
+      return [];
+    }catch(e){ return []; }
+  } else {
+      openSettingsWithHint('Please enter Endpoint, Username, and Password first.');
+    }
+  }
+
   // ===== results renderer =====
   function renderChemicals(arr){
     if(!arr || !arr.length){
@@ -335,7 +350,7 @@
     for(var i=0;i<arr.length;i++){
       var c = arr[i] || {};
       var name = (c.product_name || c.name || '').toString();
-      var manu = (c.manufacturer || c.producer || '').toString();
+      var manu = (c.manufacturer || c.producer || '').toString(); manu = manu.trim(); if(!manu) manu = '—';
       html += '<div class="chem-card">'
             + '<div class="chem-name">' + (name || 'Unknown product') + '</div>'
             + '<div class="chem-manu">' + (manu || 'Unknown manufacturer') + '</div>'
@@ -446,11 +461,9 @@
 
       if(res.ok){
         setStatusRich('Upload successful.', 'ok', true);
-        var chems = [];
-        if(data && data.result && data.result.chemicals && data.result.chemicals.length){
-          chems = data.result.chemicals;
-        }
+        var chems = parseChemicals(data);
         renderChemicals(chems);
+      } else {
       } else {
         var msg = 'Server error ('+res.status+'): ' + (textBody ? textBody.slice(0,240) : (res.statusText||''));
         setStatusRich(msg, 'err', true);
