@@ -81,7 +81,7 @@
 </head>
 <body>
   <div class="app">
-    <!-- Top bar like iOS camera: left settings, center info, right flip -->
+    <!-- Top bar: left settings, center secure badge, right flip -->
     <div class="topbar">
       <button id="openSettings" class="iconbtn" title="Settings">⚙️ Settings</button>
       <div class="pill" id="secureBadge">Checking security…</div>
@@ -95,25 +95,23 @@
         <div class="gridlines" aria-hidden="true"></div>
         <div class="hud">
           <div class="toprow">
-            <span class="chip" id="permBadge">Camera permission: unknown</span>
             <span class="chip" id="locChip">Location: <span id="locationValue">—</span></span>
           </div>
           <div class="bottomrow row">
             <input id="location" class="pill mono" placeholder="Scan QR or type storage/area" />
-            <button id="scanQrBtn" class="iconbtn" type="button">📷 Scan QR</button>
-            <label class="iconbtn" for="filePick">🖼️ Pick</label>
+            <button id="scanQrBtn" class="iconbtn" type="button">🔳 Location</button>
+            <label class="iconbtn" for="filePick">📸 Camera</label>
             <input id="filePick" type="file" accept="image/*" capture="environment" hidden />
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Bottom bar with shutter and actions -->
+    <!-- Bottom bar with shutter and optional manual upload -->
     <div class="bottombar">
       <img id="thumb" class="thumb" alt="thumbnail" />
       <button id="shutter" class="shutter" title="Take photo"></button>
       <div class="row">
-        <button id="startCam" class="iconbtn" type="button">Enable camera</button>
         <button id="upload" class="iconbtn" type="button" disabled>Upload</button>
       </div>
     </div>
@@ -188,7 +186,6 @@
     canvas: document.getElementById('canvas'),
     preview: document.getElementById('preview'),
     shutter: document.getElementById('shutter'),
-    startCam: document.getElementById('startCam'),
     upload: document.getElementById('upload'),
     flipCam: document.getElementById('flipCam'),
     thumb: document.getElementById('thumb'),
@@ -207,7 +204,6 @@
 
     status: document.getElementById('status'),
     secureBadge: document.getElementById('secureBadge'),
-    permBadge: document.getElementById('permBadge'),
 
     location: document.getElementById('location'),
     locationValue: document.getElementById('locationValue'),
@@ -247,25 +243,20 @@
   function hasUploadSettings(){ return (els.endpoint.value?.length>7) && (els.username.value?.length>0); }
   function updateUploadButton(){ els.upload.disabled = !photoBlob || !hasUploadSettings(); }
 
-  // ===== permissions & diagnostics =====
-  async function refreshPermissionBadge(){
-    let txt = 'unknown';
-    try{
-      if(navigator.permissions && navigator.permissions.query){
-        const q = await navigator.permissions.query({ name: 'camera' });
-        txt = q.state; // 'granted' | 'denied' | 'prompt'
-      } else {
-        txt = 'n/a';
-      }
-    }catch{ txt = 'n/a'; }
-    els.permBadge.textContent = `Camera permission: ${txt}`;
+  function openSettingsWithHint(hint){
+    if(hint){ setStatus(hint, 'warn'); }
+    els.settingsSheet.classList.add('active');
   }
 
-  function setSecureBadge(){
-    els.secureBadge.textContent = isSecureOrigin() ? 'Secure context ✓' : 'Needs HTTPS or localhost';
-    els.secureBadge.className = 'pill';
+  async function autoUploadOrSettings(){
+    if(hasUploadSettings()){
+      await upload();
+    } else {
+      openSettingsWithHint('Please enter Endpoint, Username, and Password first.');
+    }
   }
 
+  // ===== diagnostics =====
   async function runDiagnostics(){
     const rows = [];
     const push = (label, pass, note='') => rows.push(`<div class="cell"><label>${label}</label><div>${pass? '✅' : '❌'} <span class="mono">${note}</span></div></div>`);
@@ -277,12 +268,6 @@
       const cams = devs.filter(d=>d.kind==='videoinput');
       push('Cameras found', cams.length>0, `${cams.length}`);
     }catch(e){ push('enumerateDevices', false, e.message); }
-    try{
-      if(navigator.permissions && navigator.permissions.query){
-        const q = await navigator.permissions.query({ name: 'camera' });
-        push('Permission API', true, q.state);
-      } else { push('Permission API', false, 'not available'); }
-    }catch(e){ push('Permission API', false, e.message); }
     els.diagList.innerHTML = `<div class="list">${rows.join('')}</div>`;
   }
 
@@ -299,11 +284,10 @@
       await els.video.play();
       els.flipCam.disabled = false;
       setStatus('Camera active.', '');
-      await refreshPermissionBadge();
     } catch (err){
       console.error(err);
       if(err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError'){
-        setStatus('Permission denied. Allow camera in site settings and try again.', 'err');
+        setStatus('Permission denied. Allow camera in site settings (and reload).', 'err');
       } else if(err.name === 'NotFoundError'){
         setStatus('No camera found on this device.', 'err');
       } else if(err.name === 'OverconstrainedError'){
@@ -351,6 +335,7 @@
     els.preview.src = URL.createObjectURL(photoBlob);
     updateUploadButton();
     setStatus(`Photo captured: ${photoName}`, 'ok');
+    await autoUploadOrSettings();
   }
 
   // ===== upload =====
@@ -439,7 +424,6 @@
   els.saveSettings.addEventListener('click', ()=>{ saveSettings(); els.settingsSheet.classList.remove('active'); });
   els.runDiag.addEventListener('click', runDiagnostics);
 
-  els.startCam.addEventListener('click', startCamera);
   els.shutter.addEventListener('click', takePhoto);
   els.upload.addEventListener('click', upload);
   els.flipCam.addEventListener('click', flipCamera);
@@ -448,8 +432,10 @@
   els.scanQrBtn.addEventListener('click', startQrScan);
   els.closeQr.addEventListener('click', stopQrScan);
 
-  els.filePick.addEventListener('change', ev => {
-    const f = ev.target.files?.[0]; if(!f) return; photoBlob = f; photoName = f.name || derivePhotoName(); updateThumbFromBlob(photoBlob); updateUploadButton(); setStatus(`Picked: ${photoName}`, 'ok');
+  els.filePick.addEventListener('change', async ev => {
+    const f = ev.target.files?.[0]; if(!f) return;
+    photoBlob = f; photoName = f.name || derivePhotoName(); updateThumbFromBlob(photoBlob); updateUploadButton(); setStatus(`Captured via native camera: ${photoName}`, 'ok');
+    await autoUploadOrSettings();
   });
 
   // ===== self-tests (lightweight) =====
@@ -466,6 +452,13 @@
     assert('Photo name includes bluemilk_', nm.startsWith('bluemilk_'));
     // test: secure origin predicate
     assert('isSecureOrigin boolean', typeof isSecureOrigin() === 'boolean');
+    // test: hasUploadSettings
+    const old = { ep: els.endpoint.value, un: els.username.value };
+    els.endpoint.value = 'https://example.com/x'; els.username.value = 'u';
+    assert('hasUploadSettings true with endpoint+username', hasUploadSettings() === true);
+    els.endpoint.value = ''; els.username.value = '';
+    assert('hasUploadSettings false when missing', hasUploadSettings() === false);
+    els.endpoint.value = old.ep; els.username.value = old.un;
     // display
     const list = results.map(r=>`<div class="cell"><label>${r.name}</label><div>${r.pass? '✅' : '❌'}</div></div>`).join('');
     els.diagList.innerHTML = `<div class="list">${list}</div>`;
@@ -473,13 +466,16 @@
   }
 
   // ===== init =====
-  (function init(){
+  (async function init(){
     migrateFromLegacy();
-    setSecureBadge();
-    refreshPermissionBadge();
+    if(!isSecureOrigin()){
+      setStatus('Use HTTPS or localhost for camera access.', 'warn');
+    }
     loadSettings();
     updateLocationChip();
     runSelfTests();
+    // Start camera immediately (permission dialog may appear)
+    await startCamera();
   })();
 
   window.addEventListener('beforeunload', () => { stopCamera(); stopQrScan(); });
