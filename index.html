@@ -19,9 +19,11 @@
     .topbar{ padding-top: calc(10px + env(safe-area-inset-top)); }
     .bottombar{ padding-bottom: calc(12px + env(safe-area-inset-bottom)); background:linear-gradient(0deg, rgba(0,0,0,.85), rgba(0,0,0,.15)); }
 
-    .iconbtn{ appearance:none; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); color:var(--text); padding:8px 10px; border-radius:12px; display:inline-flex; align-items:center; gap:8px; font-size:14px; cursor:pointer; }
+  .iconbtn{ appearance:none; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); color:var(--text); padding:8px 10px; border-radius:12px; display:inline-flex; align-items:center; justify-content:center; gap:8px; font-size:14px; cursor:pointer; min-width:44px; min-height:44px; }
     .iconbtn.ghost{ background:transparent; border-color:rgba(255,255,255,.18); }
     .iconbtn:disabled{ opacity:.5; cursor:not-allowed; }
+  .iconbtn svg{ width:22px; height:22px; display:block; color:inherit; pointer-events:none; }
+  .iconbtn svg *{ stroke:currentColor; }
 
     .view{ position:relative; display:grid; place-items:center; overflow:hidden; }
     .frame{ width:min(100vw, 900px); aspect-ratio: 3/4; background:#111; border-radius:16px; overflow:hidden; border:1px solid #1a1a1a; position:relative; }
@@ -497,11 +499,20 @@
 
   // ===== QR scan =====
   async function startQrScan(){
+    if(scanning){ return; }
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      setStatus('QR scanning requires camera access on this device.', 'err');
+      return;
+    }
+    try{ stopQrScan(); }catch(e){}
+    setStatus('Starting QR scanner…', 'warn');
     els.qrOverlay.classList.add('active');
     scanning = true;
     try{
       qrStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio:false });
-      els.qrVideo.srcObject = qrStream; await els.qrVideo.play();
+      els.qrVideo.srcObject = qrStream;
+      await els.qrVideo.play();
+  setStatus('Point the camera at the QR code.', 'warn');
       scanLoop();
     }catch(err){ setStatus('QR scanner failed: ' + err.message, 'err'); stopQrScan(); }
   }
@@ -514,8 +525,8 @@
       if(v.readyState >= 2){
         c.width = v.videoWidth; c.height = v.videoHeight; ctx.drawImage(v, 0, 0, c.width, c.height);
         const img = ctx.getImageData(0,0,c.width,c.height);
-    const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
-  if(code && code.data){ els.location.value = code.data.trim(); updateLocationHint(); setStatus('QR captured: ' + els.location.value, 'ok'); stopQrScan(); break; }
+        const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+        if(code && code.data){ els.location.value = code.data.trim(); updateLocationHint(); setStatus('QR captured: ' + els.location.value, 'ok'); stopQrScan(); break; }
       }
       await new Promise(function(r){ setTimeout(r,120); });
     }
@@ -529,8 +540,8 @@
     if(s.password) els.password.value = s.password;
     if(s.locationFieldName) els.locationFieldName.value = s.locationFieldName;
     if(typeof s.remember === 'boolean') els.remember.checked = s.remember; else els.remember.checked = true;
-  updateUploadButton();
-  updateLocationHint();
+    updateUploadButton();
+    updateLocationHint();
   }
   function saveSettings(){
     const payload = {
@@ -546,17 +557,17 @@
   }
 
   // ===== events =====
-  document.getElementById('openSettings').addEventListener('click', function(){ els.settingsSheet.classList.add('active'); });
-  document.getElementById('closeSettings').addEventListener('click', function(){ els.settingsSheet.classList.remove('active'); });
-  document.getElementById('resetSettings').addEventListener('click', function(){ store.clear(); loadSettings(); setStatus('Settings reset.', 'warn'); });
-  document.getElementById('saveSettings').addEventListener('click', function(){ saveSettings(); els.settingsSheet.classList.remove('active'); });
+  els.openSettings.addEventListener('click', function(){ els.settingsSheet.classList.add('active'); });
+  els.closeSettings.addEventListener('click', function(){ els.settingsSheet.classList.remove('active'); });
+  els.resetSettings.addEventListener('click', function(){ store.clear(); loadSettings(); setStatus('Settings reset.', 'warn'); });
+  els.saveSettings.addEventListener('click', function(){ saveSettings(); els.settingsSheet.classList.remove('active'); });
 
-  document.getElementById('shutter').addEventListener('click', takePhoto);
-  document.getElementById('upload').addEventListener('click', upload);
-  document.getElementById('photoPicker').addEventListener('click', function(){ els.filePick.click(); });
-  document.getElementById('scanQrBtn').addEventListener('click', startQrScan);
+  els.shutter.addEventListener('click', takePhoto);
+  els.upload.addEventListener('click', upload);
+  if(els.photoPicker){ els.photoPicker.addEventListener('click', function(){ els.filePick.click(); }); }
+  if(els.scanQrBtn){ els.scanQrBtn.addEventListener('click', startQrScan); }
 
-  document.getElementById('filePick').addEventListener('change', async function(ev){
+  els.filePick.addEventListener('change', async function(ev){
     var f = ev.target.files && ev.target.files[0]; if(!f) return;
     try{
       setStatus('Converting to JPEG…', 'warn');
@@ -576,7 +587,9 @@
     }
   });
 
-  document.getElementById('reqToastClose').addEventListener('click', hideRequestLog);
+  els.reqToastClose.addEventListener('click', hideRequestLog);
+  els.qrOverlay.addEventListener('click', function(ev){ if(ev.target === els.qrOverlay){ stopQrScan(); } });
+  document.addEventListener('keydown', function(ev){ if(ev.key === 'Escape'){ stopQrScan(); } });
 
   // ===== self-tests (lightweight) =====
   function runSelfTests(){
