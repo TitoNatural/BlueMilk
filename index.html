@@ -1,70 +1,116 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>BlueMilk • Photo + QR + Upload</title>
   <style>
-    :root{ --bg:#000; --panel:#0d0d0d; --muted:#2a2a2a; --text:#f5f5f7; --accent:#0a84ff; }
+    :root{
+      --bg:#000; --chrome:#0b0b0b; --panel:#0d0d0d; --muted:#2a2a2a; --text:#f5f5f7; --sub:#bfbfc3; --accent:#0a84ff; --ok:#30d158; --warn:#ffd60a; --err:#ff453a;
+    }
     *{ box-sizing:border-box; }
     html,body{ height:100%; }
-    body{ margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text); }
-    .app{ display:grid; grid-template-rows:auto 1fr auto; min-height:100dvh; }
-    .topbar,.bottombar{ display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:linear-gradient(180deg, rgba(0,0,0,.65), rgba(0,0,0,.1)); }
-    .iconbtn{ appearance:none; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); color:var(--text); padding:8px 10px; border-radius:12px; display:inline-flex; align-items:center; gap:8px; font-size:14px; cursor:pointer; }
-    .iconbtn:disabled{ opacity:.5; cursor:not-allowed; }
-    .view{ position:relative; display:grid; place-items:center; overflow:hidden; }
-    .frame{ width:min(100vw,900px); aspect-ratio:3/4; background:#111; border-radius:16px; overflow:hidden; border:1px solid #1a1a1a; position:relative; }
-    video.preview{ width:100%; height:100%; object-fit:cover; display:block; background:#000; }
-    .gridlines{ position:absolute; inset:0; background:linear-gradient(90deg,transparent 32%,rgba(255,255,255,.08) 33%,rgba(255,255,255,.08) 34%,transparent 35%,transparent 65%,rgba(255,255,255,.08) 66%,rgba(255,255,255,.08) 67%,transparent 68%),linear-gradient(0deg,transparent 32%,rgba(255,255,255,.08) 33%,rgba(255,255,255,.08) 34%,transparent 35%,transparent 65%,rgba(255,255,255,.08) 66%,rgba(255,255,255,.08) 67%,transparent 68%); pointer-events:none; }
-    .hud{ position:absolute; inset:0; display:flex; flex-direction:column; justify-content:space-between; padding:10px; }
-    .chip{ background:rgba(17,17,17,.7); border:1px solid rgba(255,255,255,.12); padding:6px 10px; border-radius:999px; font-size:12px; color:#e9e9ee; }
-    .thumb{ width:48px; height:48px; border-radius:8px; background:#222; border:1px solid #333; object-fit:cover; }
-    .shutter{ width:74px; height:74px; border-radius:50%; background:#fff; border:6px solid rgba(255,255,255,.35); cursor:pointer; }
+    body{ margin:0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background:var(--bg); color:var(--text); }
 
-    /* Centered status */
-    .status{ position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:70; min-width:min(92vw,460px); max-width:92vw; font-size:13px; padding:12px 14px; border-radius:12px; border:1px dashed #2f2f2f; color:#d8d8dd; background:rgba(20,20,20,.85); box-shadow:0 8px 40px rgba(0,0,0,.6); opacity:0; pointer-events:none; transition:opacity .18s ease; }
+    /* ===== iPhone camera-like layout ===== */
+    .app{ display:grid; grid-template-rows: auto 1fr auto; min-height:100dvh; }
+    .topbar,.bottombar{ display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:linear-gradient(180deg, rgba(0,0,0,.65), rgba(0,0,0,.1)); position:relative; z-index:2; }
+    .topbar{ padding-top: calc(10px + env(safe-area-inset-top)); }
+    .bottombar{ padding-bottom: calc(12px + env(safe-area-inset-bottom)); background:linear-gradient(0deg, rgba(0,0,0,.85), rgba(0,0,0,.15)); }
+
+    .iconbtn{ appearance:none; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); color:var(--text); padding:8px 10px; border-radius:12px; display:inline-flex; align-items:center; gap:8px; font-size:14px; cursor:pointer; }
+    .iconbtn.ghost{ background:transparent; border-color:rgba(255,255,255,.18); }
+    .iconbtn:disabled{ opacity:.5; cursor:not-allowed; }
+
+    .view{ position:relative; display:grid; place-items:center; overflow:hidden; }
+    .frame{ width:min(100vw, 900px); aspect-ratio: 3/4; background:#111; border-radius:16px; overflow:hidden; border:1px solid #1a1a1a; position:relative; }
+    video.preview{ width:100%; height:100%; object-fit:cover; display:block; background:#000; }
+    .gridlines{ position:absolute; inset:0; background:
+      linear-gradient(90deg, transparent 32%, rgba(255,255,255,.08) 33%, rgba(255,255,255,.08) 34%, transparent 35%, transparent 65%, rgba(255,255,255,.08) 66%, rgba(255,255,255,.08) 67%, transparent 68%),
+      linear-gradient(0deg,  transparent 32%, rgba(255,255,255,.08) 33%, rgba(255,255,255,.08) 34%, transparent 35%, transparent 65%, rgba(255,255,255,.08) 66%, rgba(255,255,255,.08) 67%, transparent 68%);
+      pointer-events:none;
+    }
+    .hud{ position:absolute; inset:0; display:flex; flex-direction:column; justify-content:space-between; padding:10px; }
+    .hud .toprow, .hud .bottomrow{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+
+    .chip{ background:rgba(17,17,17,.7); border:1px solid rgba(255,255,255,.12); padding:6px 10px; border-radius:999px; font-size:12px; color:#e9e9ee; }
+
+    .thumb{ width:48px; height:48px; border-radius:8px; background:#222; border:1px solid #333; object-fit:cover; }
+    .shutter{ width:74px; height:74px; border-radius:50%; background:#fff; border:6px solid rgba(255,255,255,.35); cursor:pointer; box-shadow:0 0 0 2px rgba(255,255,255,.12) inset; }
+    .shutter:active{ transform:scale(.98); }
+
+    /* Centered status overlay */
+    .status{ position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:70; min-width:min(92vw,460px); max-width:92vw; font-size:13px; padding:12px 14px; border-radius:12px; border:1px dashed #2f2f2f; color:#d8d8dd; background:rgba(20,20,20,.85); box-shadow:0 8px 40px rgba(0,0,0,.6); opacity:0; pointer-events:none; transition:opacity .18s ease, transform .18s ease; }
     .status.show{ opacity:1; }
+    .status.ok{ border-color:#1f7a3a; color:#d7ffe7; background:#0f2218; }
+    .status.err{ border-color:#7a1f1f; color:#ffd9d9; background:#240e12; }
+    .status.warn{ border-color:#7a6a1f; color:#fff6d5; background:#241e0e; }
     .status .row{ display:flex; align-items:center; gap:10px; }
     .status .miniThumb{ width:48px; height:48px; object-fit:cover; border-radius:8px; border:1px solid #333; background:#111; }
 
     .hidden{ display:none !important; }
 
-    /* Results */
+    /* ===== Results list ===== */
     .results{ max-width:980px; margin:12px auto 24px; padding:0 14px; }
     .results h3{ margin:8px 0 10px; font-size:16px; color:#e7e7ec; }
-    .chem-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; }
+    .chem-grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px; }
     .chem-card{ background:#0f0f10; border:1px solid #1f1f1f; border-radius:12px; padding:10px 12px; }
     .chem-name{ font-weight:600; font-size:14px; color:#fff; }
     .chem-manu{ font-size:12px; color:#b7b7bd; margin-top:4px; }
 
-    /* Toast */
-    .toast{ position:fixed; left:50%; bottom:10px; transform:translateX(-50%); z-index:80; width:min(96vw,760px); background:rgba(20,20,20,.95); border:1px solid #2a2a2a; border-radius:12px; box-shadow:0 10px 40px rgba(0,0,0,.6); padding:10px 12px; }
+    /* ===== Request log toast (dismissible) ===== */
+    .toast{ position:fixed; left:50%; bottom:10px; transform:translateX(-50%); z-index:80; width:min(96vw, 760px); background:rgba(20,20,20,.95); border:1px solid #2a2a2a; border-radius:12px; box-shadow:0 10px 40px rgba(0,0,0,.6); padding:10px 12px; }
     .toast.hidden{ display:none !important; }
     .toast-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
-    .toast-body{ margin:8px 0 0; max-height:40vh; overflow:auto; background:#0d0d0d; border:1px solid #1f1f1f; border-radius:8px; padding:8px; color:#e5e5ea; white-space:pre-wrap; word-break:break-word; font-family:ui-monospace, Menlo, Consolas, monospace; font-size:12px; }
+    .toast-body{ margin:8px 0 0; max-height:40vh; overflow:auto; background:#0d0d0d; border:1px solid #1f1f1f; border-radius:8px; padding:8px; color:#e5e5ea; white-space:pre-wrap; word-break:break-word; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size:12px; }
+
+    /* ===== Settings sheet ===== */
+    .sheet{ position:fixed; inset:0; display:none; background:rgba(0,0,0,.6); z-index:30; }
+    .sheet.active{ display:block; }
+    .sheet .panel{ position:absolute; inset:auto 0 0 0; border-top-left-radius:18px; border-top-right-radius:18px; background:var(--panel); border-top:1px solid #1e1e1e; padding-bottom:env(safe-area-inset-bottom); }
+    .grab{ width:40px; height:5px; border-radius:999px; background:#3a3a3a; margin:10px auto 4px; }
+    .panel h3{ margin:6px 16px 10px; font-size:14px; color:#cfcfd6; font-weight:600; }
+    .list{ background:#111; border-top:1px solid #1a1a1a; border-bottom:1px solid #1a1a1a; margin:8px 0; }
+    .cell{ display:flex; align-items:center; gap:12px; padding:12px 16px; border-top:1px solid #1a1a1a; }
+    .cell:first-child{ border-top:none; }
+    .cell label{ flex:0 0 160px; font-size:14px; color:#c9c9cf; }
+    .cell input{ flex:1; background:#0b0b0b; border:1px solid #1f1f1f; color:var(--text); border-radius:10px; padding:10px 12px; font-size:14px; }
+    .panel .actions{ display:flex; gap:8px; padding:12px 16px 16px; }
+    .btn{ display:inline-flex; align-items:center; gap:8px; padding:10px 12px; border-radius:12px; background:#1a1a1a; color:#var(--text); border:1px solid #2a2a2a; cursor:pointer; user-select:none; text-decoration:none; font-size:14px; }
+    .btn.primary{ background:linear-gradient(180deg,#2b77ff,#0a51ff); border-color:#1649ff; }
   </style>
 </head>
 <body>
   <div class="app">
     <div class="topbar">
-      <button id="openSettings" class="iconbtn">⚙️ Settings</button>
+      <button id="openSettings" class="iconbtn" title="Settings">⚙️ Settings</button>
       <div></div><div></div>
     </div>
 
     <div class="view">
-      <div class="frame">
+      <div class="frame" id="cameraFrame">
         <video id="video" class="preview" playsinline muted></video>
         <div class="gridlines" aria-hidden="true"></div>
         <div class="hud">
-          <div class="toprow"><span class="chip" id="locHint">Scan QR to sign into a location</span></div>
-          <div class="bottomrow">
-            <input id="location" class="chip hidden" aria-hidden="true" />
+          <div class="toprow">
+            <span class="chip" id="locHint">Scan QR to sign into a location</span>
+          </div>
+          <div class="bottomrow row">
+            <input id="location" class="pill mono hidden" aria-hidden="true" />
             <button id="scanQrBtn" class="iconbtn" type="button" aria-label="QR">
-              <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="3" width="6" height="6" stroke="currentColor" stroke-width="2"/><rect x="15" y="3" width="6" height="6" stroke="currentColor" stroke-width="2"/><rect x="3" y="15" width="6" height="6" stroke="currentColor" stroke-width="2"/><path d="M15 15h3v3h-3zM18 18h3v3h-3zM18 15h3v-3" stroke="currentColor" stroke-width="2"/></svg>
+              <svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3" y="3" width="6" height="6" stroke="currentColor" stroke-width="2"/>
+                <rect x="15" y="3" width="6" height="6" stroke="currentColor" stroke-width="2"/>
+                <rect x="3" y="15" width="6" height="6" stroke="currentColor" stroke-width="2"/>
+                <path d="M15 15h3v3h-3zM18 18h3v3h-3zM18 15h3v-3" stroke="currentColor" stroke-width="2"/>
+              </svg>
             </button>
             <label class="iconbtn" for="filePick" aria-label="Photos">
-              <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="5" width="18" height="14" rx="2" ry="2" stroke="currentColor" stroke-width="2"/><circle cx="9" cy="11" r="2" stroke="currentColor" stroke-width="2"/><path d="M21 17l-5-5-4 4-2-2-5 5" stroke="currentColor" stroke-width="2"/></svg>
+              <svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3" y="5" width="18" height="14" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+                <circle cx="9" cy="11" r="2" stroke="currentColor" stroke-width="2"/>
+                <path d="M21 17l-5-5-4 4-2-2-5 5" stroke="currentColor" stroke-width="2"/>
+              </svg>
             </label>
             <input id="filePick" type="file" accept="image/*" hidden />
           </div>
@@ -74,8 +120,10 @@
 
     <div class="bottombar">
       <img id="thumb" class="thumb" alt="thumbnail" />
-      <button id="shutter" class="shutter" title="Take photo" disabled></button>
-      <div><button id="upload" class="iconbtn" type="button" disabled>Upload</button></div>
+      <button id="shutter" class="shutter" title="Take photo"></button>
+      <div class="row">
+        <button id="upload" class="iconbtn" type="button" disabled>Upload</button>
+      </div>
     </div>
   </div>
 
@@ -86,6 +134,7 @@
     <div id="chemList" class="chem-grid"></div>
   </section>
 
+  <!-- Request log (dismissible) -->
   <div id="reqToast" class="toast hidden" role="status" aria-live="polite">
     <div class="toast-row">
       <strong id="reqToastTitle">Request failure</strong>
@@ -100,8 +149,8 @@
       <h3>BlueMilk Settings</h3>
       <div class="list">
         <div class="cell"><label for="endpoint">Endpoint URL</label><input id="endpoint" type="url" placeholder="https://api.example.com/upload" autocomplete="url"></div>
-        <div class="cell"><label for="username">Username (optional)</label><input id="username" type="text" placeholder=""></div>
-        <div class="cell"><label for="password">Password (optional)</label><input id="password" type="password" placeholder=""></div>
+        <div class="cell"><label for="username">Username</label><input id="username" type="text" placeholder="api-user" autocomplete="username"></div>
+        <div class="cell"><label for="password">Password</label><input id="password" type="password" placeholder="••••••••" autocomplete="current-password"></div>
         <div class="cell"><label for="locationFieldName">Field for location</label><input id="locationFieldName" type="text" value="location"></div>
         <div class="cell"><label for="remember">Remember on this device</label><input id="remember" class="toggle" type="checkbox" checked></div>
       </div>
@@ -123,110 +172,459 @@
   </div>
 
   <script>
-  // ===== store =====
-  const store={ key:'bluemilk:v1', read:()=>{try{return JSON.parse(localStorage.getItem('bluemilk:v1'))||{};}catch(e){return{};}}, write:o=>localStorage.setItem('bluemilk:v1',JSON.stringify(o)), clear:()=>localStorage.removeItem('bluemilk:v1') };
-
-  // ===== els =====
-  const els={ video:$('#video'), canvas:$('#canvas'), preview:$('#preview'), shutter:$('#shutter'), upload:$('#upload'), thumb:$('#thumb'), endpoint:$('#endpoint'), username:$('#username'), password:$('#password'), locationFieldName:$('#locationFieldName'), remember:$('#remember'), settingsSheet:$('#settingsSheet'), openSettings:$('#openSettings'), saveSettings:$('#saveSettings'), closeSettings:$('#closeSettings'), resetSettings:$('#resetSettings'), status:$('#status'), location:$('#location'), locHint:$('#locHint'), scanQrBtn:$('#scanQrBtn'), qrOverlay:$('#qrOverlay'), qrVideo:$('#qrVideo'), filePick:$('#filePick'), chemResults:$('#chemResults'), chemList:$('#chemList'), reqToast:$('#reqToast'), reqToastTitle:$('#reqToastTitle'), reqToastBody:$('#reqToastBody'), reqToastClose:$('#reqToastClose') };
-  function $(id){ return document.getElementById(id); }
-
-  // ===== state =====
-  let mediaStream=null, photoBlob=null, photoName=null, qrStream=null, scanning=false, videoReady=false, statusHideTimer=null, lastStatusURL=null;
-
-  // ===== status / toast =====
-  function scheduleStatusHide(kind){ try{clearTimeout(statusHideTimer);}catch{} let ms=3200; if(kind==='err')ms=6000; else if(kind==='warn')ms=3800; else if(kind==='ok')ms=2600; statusHideTimer=setTimeout(()=>{ els.status.classList.remove('show'); if(lastStatusURL){try{URL.revokeObjectURL(lastStatusURL);}catch{} lastStatusURL=null;} },ms); }
-  function setStatus(msg,cls=''){ els.status.className='status '+(cls||'')+' show'; els.status.textContent=msg; scheduleStatusHide(cls||'ok'); }
-  function setStatusRich(msg,cls='ok',thumb=false){ els.status.className='status '+(cls||'')+' show'; if(thumb && photoBlob){ const url=URL.createObjectURL(photoBlob); if(lastStatusURL&&lastStatusURL!==url){try{URL.revokeObjectURL(lastStatusURL);}catch{}} lastStatusURL=url; els.status.innerHTML='<div class="row"><img class="miniThumb" src="'+url+'"/><div>'+msg+'</div></div>'; } else { els.status.textContent=msg; } scheduleStatusHide(cls||'ok'); }
-  function showRequestLog(text,title){ els.reqToastTitle.textContent=title||'Request failure'; els.reqToastBody.textContent=String(text||''); els.reqToast.classList.remove('hidden'); }
-  function hideRequestLog(){ els.reqToast.classList.add('hidden'); }
-
-  // ===== utils =====
-  const ua=navigator.userAgent||''; const IS_IOS=/iPad|iPhone|iPod/.test(ua);
-  const b64=s=>btoa(unescape(encodeURIComponent(s)));
-  const buildAuthHeader=(u,p)=> (u? {'Authorization':'Basic '+b64((u||'')+':'+(p||''))} : {});
-  const nowIso=()=>new Date().toISOString();
-  function derivePhotoName(){ const ts=nowIso().replace(/:/g,'').replace(/-/g,'').replace('T','_').replace('Z',''); return 'bluemilk_'+ts+'.jpg'; }
-  function isSecureOrigin(){ return location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'; }
-  function updateThumbFromBlob(b){ if(!b){ els.thumb.src=''; return;} els.thumb.src=URL.createObjectURL(b); }
-  function updateLocationHint(){ const v=(els.location.value||'').trim(); els.locHint.textContent = v?('Signed into: '+v):'Scan QR to sign into a location'; }
-  function hasUploadSettings(){ return (els.endpoint.value||'').trim().length>7; } // nur Endpoint nötig
-  function updateUploadButton(){ els.upload.disabled = !photoBlob || !hasUploadSettings(); }
-
-  // ===== parsing / rendering =====
-  function parseChemicals(d){ try{ if(!d) return []; if(Array.isArray(d)) return d; if(d&&Array.isArray(d.result)) return d.result; if(d&&d.result&&Array.isArray(d.result.chemicals)) return d.result.chemicals; if(Array.isArray(d.chemicals)) return d.chemicals; return []; }catch{ return []; } }
-  function renderChemicals(arr){ if(!arr||!arr.length){ els.chemList.innerHTML=''; els.chemResults.classList.add('hidden'); return;} let html=''; for(let i=0;i<arr.length;i++){ const c=arr[i]||{}; const name=(c.product_name||c.name||'').toString(); let manu=(c.manufacturer||c.producer||'').toString().trim(); if(!manu) manu='—'; html+='<div class="chem-card"><div class="chem-name">'+(name||'Unknown product')+'</div><div class="chem-manu">'+manu+'</div></div>'; } els.chemList.innerHTML=html; els.chemResults.classList.remove('hidden'); try{ els.chemResults.scrollIntoView({behavior:'smooth',block:'start'});}catch{} }
-
-  // ===== canvas/jpeg helpers =====
-  function fitSize(w,h,maxDim=2048){ let rw=w,rh=h; if(w>h && w>maxDim){ rh=Math.round(h*maxDim/w); rw=maxDim; } else if(h>=w && h>maxDim){ rw=Math.round(w*maxDim/h); rh=maxDim; } return {w:rw,h:rh}; }
-  function dataURLToBlob(dataURL){ try{ const parts=String(dataURL||'').split(','); if(parts.length<2) return null; const mimeMatch=parts[0].match(/data:(.*?);base64/); const mime=mimeMatch?mimeMatch[1]:'image/jpeg'; const bstr=atob(parts[1]); let n=bstr.length; const u8=new Uint8Array(n); while(n--) u8[n]=bstr.charCodeAt(n); return new Blob([u8],{type:mime}); }catch{ return null; } }
-  function canvasToJpegBlob(canvas,q=0.92){ return new Promise((resolve)=>{ try{ if(canvas&&canvas.toBlob){ canvas.toBlob((b)=>{ if(b){ resolve(b); } else { try{ const d=canvas.toDataURL('image/jpeg',q); resolve(dataURLToBlob(d)); }catch{ resolve(null);} } },'image/jpeg',q); return; } const d2=canvas.toDataURL('image/jpeg',q); resolve(dataURLToBlob(d2)); }catch{ resolve(null);} }); }
-
-  // Always convert selected files to JPEG (skip createImageBitmap on iOS)
-  function fileToJpegBlob(file){ return new Promise(async (resolve)=>{
+  // ===== storage utils =====
+  const store = {
+    key: 'bluemilk:v1',
+    read: function(){ try{ return JSON.parse(localStorage.getItem(this.key)) || {}; }catch(e){ return {}; } },
+    write: function(obj){ localStorage.setItem(this.key, JSON.stringify(obj)); },
+    clear: function(){ localStorage.removeItem(this.key); }
+  };
+  function migrateFromLegacy(){
     try{
-      if(!IS_IOS && 'createImageBitmap' in window){
-        let bmp=null; try{ bmp=await createImageBitmap(file); }catch{ bmp=null; }
-        if(bmp){ const s=fitSize(bmp.width,bmp.height,2048); els.canvas.width=s.w; els.canvas.height=s.h; const ctx=els.canvas.getContext('2d'); ctx.drawImage(bmp,0,0,s.w,s.h); const b=await canvasToJpegBlob(els.canvas,0.92); return resolve(b||file); }
+      const existing = localStorage.getItem(store.key);
+      if(existing) return;
+      const legacyKeys = ['chemsnap:v2','chemsnap:v1','chemsnap:v0'];
+      for(var i=0;i<legacyKeys.length;i++){
+        const k = legacyKeys[i];
+        const v = localStorage.getItem(k);
+        if(v){ localStorage.setItem(store.key, v); break; }
       }
-    }catch{}
-    // Fallback FileReader + <img>
-    try{
-      const reader=new FileReader();
-      reader.onload=function(){ const img=new Image(); img.onload=async function(){ const s=fitSize(img.naturalWidth||img.width,img.naturalHeight||img.height,2048); els.canvas.width=s.w; els.canvas.height=s.h; const ctx=els.canvas.getContext('2d'); ctx.drawImage(img,0,0,s.w,s.h); const b=await canvasToJpegBlob(els.canvas,0.92); resolve(b||file); }; img.onerror=function(){ resolve(file); }; img.src=reader.result; };
-      reader.onerror=function(){ resolve(file); };
-      reader.readAsDataURL(file);
-    }catch{ resolve(file); }
-  }); }
-
-  // ===== video readiness =====
-  function waitForVideoFrame(timeoutMs=2000){ return new Promise((resolve)=>{ try{ if(els.video && els.video.requestVideoFrameCallback){ let done=false; els.video.requestVideoFrameCallback(()=>{ if(!done){done=true; resolve();} }); setTimeout(()=>{ if(!done) resolve(); }, timeoutMs); } else { const start=Date.now(); (function check(){ if(els.video && els.video.readyState>=2 && els.video.videoWidth>0 && els.video.videoHeight>0){ resolve(); return;} if(Date.now()-start>timeoutMs){ resolve(); return;} setTimeout(check,50); })(); } }catch{ resolve(); } }); }
-
-  // ===== camera =====
-  async function startCamera(){ if(!isSecureOrigin()){ setStatus('Camera blocked: HTTPS or localhost required.','err'); return; } try{ const cs={ video:{ facingMode:{ideal:'environment'}, width:{ideal:1920}, height:{ideal:1080} }, audio:false }; mediaStream=await navigator.mediaDevices.getUserMedia(cs); els.video.srcObject=mediaStream; await els.video.play(); await waitForVideoFrame(); videoReady=true; els.shutter.disabled=false; setStatus('Camera active.'); }catch(err){ setStatus('Camera error: '+err.message,'err'); } }
-  function stopCamera(){ if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null; } }
-  function captureFrameToBlob(){ const v=els.video,c=els.canvas; if(!v||v.readyState<2||!v.videoWidth||!v.videoHeight) return Promise.resolve(null); const r=v.videoWidth/v.videoHeight||4/3; const w=Math.min(2048, v.videoWidth||1600); const h=Math.round(w/r); c.width=w; c.height=h; const ctx=c.getContext('2d'); try{ ctx.drawImage(v,0,0,w,h);}catch{ return Promise.resolve(null);} return canvasToJpegBlob(c,0.92).then(b=>b||null); }
-  async function takePhoto(){ if(!mediaStream){ setStatus('Camera is not active.','warn'); return;} if(!videoReady){ await waitForVideoFrame(); } setStatus('Capturing…'); photoBlob=await captureFrameToBlob(); if(!photoBlob){ setStatus('Capture failed. Please try again.','err'); return;} photoName=derivePhotoName(); updateThumbFromBlob(photoBlob); els.preview.src=URL.createObjectURL(photoBlob); updateUploadButton(); setStatus('Photo captured: '+photoName,'ok'); await autoUploadOrSettings(); }
-
-  // ===== upload =====
-  async function upload(){ if(!photoBlob){ setStatus('No photo to upload.','warn'); return;} const endpoint=(els.endpoint.value||'').trim(); if(!endpoint){ setStatus('Endpoint is required.','err'); return; }
-    const fd=new FormData(); fd.append('image', photoBlob, photoName||'image.jpg'); const locField=(els.locationFieldName.value||'location').trim(); fd.append(locField,(els.location.value||'').trim()); fd.append('clientTime',nowIso()); fd.append('app','BlueMilk-1.0');
-    els.upload.disabled=true; setStatusRich('Uploading…','warn',true);
-    try{
-      const res=await fetch(endpoint,{ method:'POST', headers:{...buildAuthHeader(els.username.value,els.password.value)}, body:fd, mode:'cors', redirect:'follow' });
-      let data=null, txt=''; try{ data=await res.json(); }catch{ try{ txt=await res.text(); }catch{} }
-      if(res.ok){ setStatusRich('Upload successful.','ok',true); renderChemicals(parseChemicals(data)); hideRequestLog(); }
-      else { const detail=data?JSON.stringify(data,null,2):txt; setStatusRich('Server error ('+res.status+'): '+(res.statusText||''),'err',true); showRequestLog('Server error ('+res.status+'): '+(res.statusText||'')+'\n\n'+(detail||''),'Request failure'); }
-    }catch(err){ setStatusRich('Network error: '+err.message,'err',true); showRequestLog(err&&err.stack?err.stack:String(err),'Network error'); }
-    finally{ els.upload.disabled=false; }
+    }catch(e){}
   }
 
-  // ===== QR =====
-  async function startQrScan(){ els.qrOverlay.classList.add('active'); scanning=true; try{ qrStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false}); els.qrVideo.srcObject=qrStream; await els.qrVideo.play(); scanLoop(); }catch(err){ setStatus('QR scanner failed: '+err.message,'err'); stopQrScan(); } }
-  function stopQrScan(){ scanning=false; els.qrOverlay.classList.remove('active'); if(qrStream){ qrStream.getTracks().forEach(t=>t.stop()); qrStream=null; } }
-  async function scanLoop(){ if(typeof window.jsQR!=='function'){ setStatus('QR library not loaded.','err'); return;} const v=els.qrVideo; const c=document.createElement('canvas'); const ctx=c.getContext('2d',{willReadFrequently:true}); while(scanning){ if(v.readyState>=2){ c.width=v.videoWidth; c.height=v.videoHeight; ctx.drawImage(v,0,0,c.width,c.height); const img=ctx.getImageData(0,0,c.width,c.height); const code=jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'}); if(code&&code.data){ els.location.value=code.data.trim(); updateLocationHint(); setStatus('QR captured: '+els.location.value,'ok'); stopQrScan(); break; } } await new Promise(r=>setTimeout(r,120)); } }
+  // ===== elements =====
+  const els = {
+    video: document.getElementById('video'),
+    canvas: document.getElementById('canvas'),
+    preview: document.getElementById('preview'),
+    shutter: document.getElementById('shutter'),
+    upload: document.getElementById('upload'),
+    thumb: document.getElementById('thumb'),
+
+    endpoint: document.getElementById('endpoint'),
+    username: document.getElementById('username'),
+    password: document.getElementById('password'),
+    locationFieldName: document.getElementById('locationFieldName'),
+    remember: document.getElementById('remember'),
+
+    settingsSheet: document.getElementById('settingsSheet'),
+    openSettings: document.getElementById('openSettings'),
+    saveSettings: document.getElementById('saveSettings'),
+    closeSettings: document.getElementById('closeSettings'),
+    resetSettings: document.getElementById('resetSettings'),
+
+    status: document.getElementById('status'),
+
+    location: document.getElementById('location'),
+    locHint: document.getElementById('locHint'),
+
+    scanQrBtn: document.getElementById('scanQrBtn'),
+    qrOverlay: document.getElementById('qrOverlay'),
+    qrVideo: document.getElementById('qrVideo'),
+    filePick: document.getElementById('filePick'),
+
+    chemResults: document.getElementById('chemResults'),
+    chemList: document.getElementById('chemList'),
+
+    reqToast: document.getElementById('reqToast'),
+    reqToastTitle: document.getElementById('reqToastTitle'),
+    reqToastBody: document.getElementById('reqToastBody'),
+    reqToastClose: document.getElementById('reqToastClose'),
+  };
+
+  // ===== state =====
+  var mediaStream = null;
+  var facing = 'environment';
+  var photoBlob = null;
+  var photoName = null;
+  var qrStream = null;
+  var scanning = false;
+  var statusHideTimer = null;
+  var lastStatusURL = null;
+
+  // ===== helpers =====
+  function scheduleStatusHide(kind){
+    try{ clearTimeout(statusHideTimer); }catch(e){}
+    var ms = 3200;
+    if(kind === 'err') ms = 6000;
+    else if(kind === 'warn') ms = 3800;
+    else if(kind === 'ok') ms = 2600;
+    statusHideTimer = setTimeout(function(){
+      els.status.classList.remove('show');
+      if(lastStatusURL){ try{ URL.revokeObjectURL(lastStatusURL); }catch(e){} lastStatusURL = null; }
+    }, ms);
+  }
+
+  function setStatus(msg, cls){
+    if(typeof cls === 'undefined') cls = '';
+    els.status.className = 'status ' + (cls || '') + ' show';
+    els.status.textContent = msg;
+    scheduleStatusHide(cls || 'ok');
+  }
+
+  function setStatusRich(msg, cls, includeThumb){
+    if(typeof cls === 'undefined') cls = 'ok';
+    if(typeof includeThumb === 'undefined') includeThumb = false;
+    els.status.className = 'status ' + (cls || '') + ' show';
+    if(includeThumb && photoBlob){
+      const url = URL.createObjectURL(photoBlob);
+      if(lastStatusURL && lastStatusURL !== url){ try{ URL.revokeObjectURL(lastStatusURL); }catch(e){} }
+      lastStatusURL = url;
+      els.status.innerHTML = '<div class="row"><img class="miniThumb" src="' + url + '" alt="sent photo"/><div>' + msg + '</div></div>';
+    } else {
+      els.status.textContent = msg;
+    }
+    scheduleStatusHide(cls || 'ok');
+  }
+
+  function showRequestLog(text, title){
+    try{
+      els.reqToastTitle.textContent = title || 'Request failure';
+      els.reqToastBody.textContent = (text || '').toString();
+      els.reqToast.classList.remove('hidden');
+    }catch(e){}
+  }
+  function hideRequestLog(){ try{ els.reqToast.classList.add('hidden'); }catch(e){} }
+
+  function b64(s){ return btoa(unescape(encodeURIComponent(s))); }
+  function buildAuthHeader(u,p){ return 'Basic ' + b64((u||'') + ':' + (p||'')); }
+  function nowIso(){ return new Date().toISOString(); }
+  function derivePhotoName(){
+    const ts = nowIso().replace(/:/g,'').replace(/-/g,'').replace('T','_').replace('Z','');
+    return 'bluemilk_' + ts + '.jpg';
+  }
+  function isSecureOrigin(){
+    return location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  }
+  function updateThumbFromBlob(blob){ if(!blob){ els.thumb.src=''; return; } els.thumb.src = URL.createObjectURL(blob); }
+  function updateLocationHint(){
+    const val = (els.location.value||'').trim();
+    els.locHint.textContent = val ? ('Signed into: ' + val) : 'Scan QR to sign into a location';
+  }
+  function hasUploadSettings(){ return (els.endpoint.value && els.endpoint.value.length>7) && (els.username.value && els.username.value.length>0); }
+  function updateUploadButton(){ els.upload.disabled = !photoBlob || !hasUploadSettings(); }
+
+  function openSettingsWithHint(hint){
+    if(hint){ setStatus(hint, 'warn'); }
+    els.settingsSheet.classList.add('active');
+  }
+
+  async function autoUploadOrSettings(){
+    if(hasUploadSettings()){
+      await upload();
+    } else {
+      openSettingsWithHint('Please enter Endpoint, Username, and Password first.');
+    }
+  }
+
+  function parseChemicals(data){
+    try{
+      if(!data) return [];
+      if(Array.isArray(data)) return data;
+      if(data && Array.isArray(data.result)) return data.result;
+      if(data && data.result && Array.isArray(data.result.chemicals)) return data.result.chemicals;
+      if(Array.isArray(data.chemicals)) return data.chemicals;
+      return [];
+    }catch(e){ return []; }
+  }
+
+  function fitSize(w, h, maxDim){
+    if(!maxDim) maxDim = 2048;
+    var rw = w, rh = h;
+    if(w > h && w > maxDim){ rh = Math.round(h * maxDim / w); rw = maxDim; }
+    else if(h >= w && h > maxDim){ rw = Math.round(w * maxDim / h); rh = maxDim; }
+    return { w: rw, h: rh };
+  }
+  function fileToJpegBlob(file){
+    return new Promise(async function(resolve){
+      try{
+        if('createImageBitmap' in window){
+          var bmp = null;
+          try{ bmp = await createImageBitmap(file); }catch(e){ bmp = null; }
+          if(bmp){
+            var size = fitSize(bmp.width, bmp.height, 2048);
+            els.canvas.width = size.w; els.canvas.height = size.h;
+            var ctx = els.canvas.getContext('2d');
+            ctx.drawImage(bmp, 0, 0, size.w, size.h);
+            return els.canvas.toBlob(function(b){ resolve(b || file); }, 'image/jpeg', 0.92);
+          }
+        }
+      }catch(e){}
+      try{
+        var reader = new FileReader();
+        reader.onload = function(){
+          var img = new Image();
+          img.onload = function(){
+            var size2 = fitSize(img.naturalWidth||img.width, img.naturalHeight||img.height, 2048);
+            els.canvas.width = size2.w; els.canvas.height = size2.h;
+            var ctx2 = els.canvas.getContext('2d');
+            ctx2.drawImage(img, 0, 0, size2.w, size2.h);
+            els.canvas.toBlob(function(b){ resolve(b || file); }, 'image/jpeg', 0.92);
+          };
+          img.onerror = function(){ resolve(file); };
+          img.src = reader.result;
+        };
+        reader.onerror = function(){ resolve(file); };
+        reader.readAsDataURL(file);
+      }catch(e){ resolve(file); }
+    });
+  }
+
+  function renderChemicals(arr){
+    if(!arr || !arr.length){
+      els.chemList.innerHTML = '';
+      els.chemResults.classList.add('hidden');
+      return;
+    }
+    var html = '';
+    for(var i=0;i<arr.length;i++){
+      var c = arr[i] || {};
+      var name = (c.product_name || c.name || '').toString();
+      var manu = (c.manufacturer || c.producer || '').toString(); manu = manu.trim(); if(!manu) manu = '—';
+      html += '<div class="chem-card">'
+            + '<div class="chem-name">' + (name || 'Unknown product') + '</div>'
+            + '<div class="chem-manu">' + (manu || 'Unknown manufacturer') + '</div>'
+            + '</div>';
+    }
+    els.chemList.innerHTML = html;
+    els.chemResults.classList.remove('hidden');
+    try{ els.chemResults.scrollIntoView({ behavior:'smooth', block:'start' }); }catch(e){}
+  }
+
+  // ===== camera =====
+  async function startCamera(){
+    if(!isSecureOrigin()){
+      setStatus('Camera blocked: page must be served over HTTPS or on localhost.', 'err');
+      return;
+    }
+    try{
+      const constraints = { video: { facingMode: { ideal: facing }, width:{ ideal:1920 }, height:{ ideal:1080 } }, audio:false };
+      mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      els.video.srcObject = mediaStream;
+      await els.video.play();
+      setStatus('Camera active.', '');
+    } catch (err){
+      console.error(err);
+      if(err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError'){
+        setStatus('Permission denied. Allow camera in site settings (and reload).', 'err');
+      } else if(err.name === 'NotFoundError'){
+        setStatus('No camera found on this device.', 'err');
+      } else if(err.name === 'OverconstrainedError'){
+        setStatus('Requested camera constraints not satisfied. Trying default…', 'warn');
+        try{
+          const stream = await navigator.mediaDevices.getUserMedia({ video:true, audio:false });
+          mediaStream = stream; els.video.srcObject = stream; await els.video.play();
+        }catch(e2){ setStatus('Camera failed with default constraints: '+ e2.message, 'err'); }
+      } else {
+        setStatus('Camera error: ' + err.message, 'err');
+      }
+    }
+  }
+
+  function stopCamera(){ if(mediaStream){ mediaStream.getTracks().forEach(function(t){ t.stop(); }); mediaStream = null; } }
+
+  function captureFrameToBlob(){
+    const v = els.video; const c = els.canvas;
+    const ratio = v.videoWidth / v.videoHeight || 4/3;
+    const maxW = Math.min(2048, v.videoWidth || 1600);
+    const w = maxW; const h = Math.round(w / ratio);
+    c.width = w; c.height = h;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(v, 0, 0, w, h);
+    return new Promise(function(resolve){ c.toBlob(function(b){ resolve(b); }, 'image/jpeg', 0.92); });
+  }
+
+  async function takePhoto(){
+    if(!mediaStream){ setStatus('Camera is not active.', 'warn'); return; }
+    setStatus('Capturing…');
+    photoBlob = await captureFrameToBlob();
+    photoName = derivePhotoName();
+    updateThumbFromBlob(photoBlob);
+    els.preview.src = URL.createObjectURL(photoBlob);
+    updateUploadButton();
+    setStatus('Photo captured: ' + photoName, 'ok');
+    await autoUploadOrSettings();
+  }
+
+  // ===== upload =====
+  async function upload(){
+    if(!photoBlob){ setStatus('No photo to upload.', 'warn'); return; }
+    const endpoint = (els.endpoint.value||'').trim();
+    if(!endpoint){ setStatus('Endpoint is required.', 'err'); return; }
+
+    const form = new FormData();
+    form.append('image', photoBlob, photoName || 'image.jpg');
+    const locationField = (els.locationFieldName.value||'location').trim();
+    form.append(locationField, (els.location.value||'').trim());
+    form.append('clientTime', nowIso());
+    form.append('app', 'BlueMilk-1.0');
+
+    els.upload.disabled = true;
+    setStatusRich('Uploading…', 'warn', true);
+    try{
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Authorization': buildAuthHeader(els.username.value, els.password.value) },
+        body: form,
+        mode: 'cors',
+        redirect: 'follow'
+      });
+      var textBody = '';
+      var data = null;
+      try{ data = await res.json(); }
+      catch(e){ try{ textBody = await res.text(); }catch(e2){} }
+
+      if(res.ok){
+        setStatusRich('Upload successful.', 'ok', true);
+        var chems = parseChemicals(data);
+        renderChemicals(chems);
+        hideRequestLog();
+      } else {
+        var detailStr = data ? JSON.stringify(data, null, 2) : textBody;
+        setStatusRich('Server error ('+res.status+'): ' + (res.statusText||''), 'err', true);
+        showRequestLog(('Server error ('+res.status+'): '+(res.statusText||'')) + '\n\n' + (detailStr||''), 'Request failure');
+      }
+    }catch(err){
+      setStatusRich('Network error: ' + err.message, 'err', true);
+      showRequestLog((err && err.stack) ? err.stack : String(err), 'Network error');
+    }
+    finally{ els.upload.disabled = false; }
+  }
+
+  // ===== QR scan =====
+  async function startQrScan(){
+    els.qrOverlay.classList.add('active');
+    scanning = true;
+    try{
+      qrStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio:false });
+      els.qrVideo.srcObject = qrStream; await els.qrVideo.play();
+      scanLoop();
+    }catch(err){ setStatus('QR scanner failed: ' + err.message, 'err'); stopQrScan(); }
+  }
+  function stopQrScan(){ scanning = false; els.qrOverlay.classList.remove('active'); if(qrStream){ qrStream.getTracks().forEach(function(t){ t.stop(); }); qrStream=null; } }
+
+  async function scanLoop(){
+    if(typeof window.jsQR !== 'function'){ setStatus('QR library not loaded.', 'err'); return; }
+    const v = els.qrVideo; const c = document.createElement('canvas'); const ctx = c.getContext('2d', { willReadFrequently: true });
+    while(scanning){
+      if(v.readyState >= 2){
+        c.width = v.videoWidth; c.height = v.videoHeight; ctx.drawImage(v, 0, 0, c.width, c.height);
+        const img = ctx.getImageData(0,0,c.width,c.height);
+        const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+        if(code && code.data){ els.location.value = code.data.trim(); updateLocationHint(); setStatus('QR captured: ' + els.location.value, 'ok'); stopQrScan(); break; }
+      }
+      await new Promise(function(r){ setTimeout(r,120); });
+    }
+  }
 
   // ===== settings =====
-  function loadSettings(){ const s=store.read(); if(s.endpoint) els.endpoint.value=s.endpoint; if(s.username) els.username.value=s.username; if(s.password) els.password.value=s.password; if(s.locationFieldName) els.locationFieldName.value=s.locationFieldName; if(typeof s.remember==='boolean') els.remember.checked=s.remember; else els.remember.checked=true; updateUploadButton(); updateLocationHint(); }
-  function saveSettings(){ const p={ endpoint:(els.endpoint.value||'').trim(), username:els.username.value||'', password:els.password.value||'', locationFieldName:(els.locationFieldName.value||'location').trim(), remember:!!els.remember.checked }; if(p.remember){ store.write(p);} else { store.clear(); } setStatus('Settings saved.','ok'); updateUploadButton(); }
+  function loadSettings(){
+    const s = store.read();
+    if(s.endpoint) els.endpoint.value = s.endpoint;
+    if(s.username) els.username.value = s.username;
+    if(s.password) els.password.value = s.password;
+    if(s.locationFieldName) els.locationFieldName.value = s.locationFieldName;
+    if(typeof s.remember === 'boolean') els.remember.checked = s.remember; else els.remember.checked = true;
+    updateUploadButton();
+    updateLocationHint();
+  }
+  function saveSettings(){
+    const payload = {
+      endpoint: (els.endpoint.value||'').trim(),
+      username: els.username.value||'',
+      password: els.password.value||'',
+      locationFieldName: (els.locationFieldName.value||'location').trim(),
+      remember: !!els.remember.checked
+    };
+    if(payload.remember){ store.write(payload); } else { store.clear(); }
+    setStatus('Settings saved.', 'ok');
+    updateUploadButton();
+  }
 
   // ===== events =====
-  els.openSettings.addEventListener('click',()=>els.settingsSheet.classList.add('active'));
-  els.closeSettings.addEventListener('click',()=>els.settingsSheet.classList.remove('active'));
-  els.resetSettings.addEventListener('click',()=>{ store.clear(); loadSettings(); setStatus('Settings reset.','warn'); });
-  els.saveSettings.addEventListener('click',()=>{ saveSettings(); els.settingsSheet.classList.remove('active'); });
-  els.reqToastClose.addEventListener('click', hideRequestLog);
+  document.getElementById('openSettings').addEventListener('click', function(){ els.settingsSheet.classList.add('active'); });
+  document.getElementById('closeSettings').addEventListener('click', function(){ els.settingsSheet.classList.remove('active'); });
+  document.getElementById('resetSettings').addEventListener('click', function(){ store.clear(); loadSettings(); setStatus('Settings reset.', 'warn'); });
+  document.getElementById('saveSettings').addEventListener('click', function(){ saveSettings(); els.settingsSheet.classList.remove('active'); });
 
-  els.shutter.addEventListener('click', takePhoto);
-  els.upload.addEventListener('click', upload);
-  els.scanQrBtn.addEventListener('click', startQrScan);
-  els.filePick.addEventListener('change', async (ev)=>{ const f=ev.target.files&&ev.target.files[0]; if(!f) return; try{ setStatus('Converting to JPEG…','warn'); const jpeg=await fileToJpegBlob(f); photoBlob=jpeg||f; photoName=derivePhotoName(); updateThumbFromBlob(photoBlob); updateUploadButton(); setStatus('Selected from Photos: '+photoName+' (JPEG)','ok'); await autoUploadOrSettings(); }catch(e){ setStatus('Photo conversion failed: '+(e&&e.message?e.message:e),'err'); showRequestLog(String(e&&e.message?e.message:e),'Conversion error'); } });
+  document.getElementById('shutter').addEventListener('click', takePhoto);
+  document.getElementById('upload').addEventListener('click', upload);
+  document.getElementById('scanQrBtn').addEventListener('click', startQrScan);
 
-  // ===== init =====
-  (async function init(){ if(!isSecureOrigin()) setStatus('Use HTTPS or localhost for camera access.','warn'); loadSettings(); renderChemicals([]); await startCamera(); })();
-  window.addEventListener('beforeunload',()=>{ stopCamera(); });
+  document.getElementById('filePick').addEventListener('change', async function(ev){
+    var f = ev.target.files && ev.target.files[0]; if(!f) return;
+    try{
+      setStatus('Converting to JPEG…', 'warn');
+      var jpeg = await fileToJpegBlob(f);
+      if(!(jpeg && jpeg.type && jpeg.type.indexOf('image/jpeg') === 0)){
+        // some browsers may leave type empty; still treat as jpeg
+      }
+      photoBlob = jpeg || f;
+      photoName = derivePhotoName();
+      updateThumbFromBlob(photoBlob);
+      updateUploadButton();
+      setStatus('Selected from Photos: ' + photoName + ' (JPEG)', 'ok');
+      await autoUploadOrSettings();
+    }catch(e){
+      setStatus('Photo conversion failed: ' + (e && e.message ? e.message : e), 'err');
+      showRequestLog(String(e && e.message ? e.message : e), 'Conversion error');
+    }
+  });
+
+  document.getElementById('reqToastClose').addEventListener('click', hideRequestLog);
+
+  // ===== self-tests (lightweight) =====
+  function runSelfTests(){
+    const results = [];
+    function assert(name, cond){ results.push({ name: name, pass: !!cond }); }
+    const hdr = buildAuthHeader('u','p');
+    assert('Auth header prefix', hdr.indexOf('Basic ') === 0);
+    assert('Auth header body length > 6', hdr.length > 6);
+    const nm = derivePhotoName();
+    assert('Photo name suffix .jpg', nm.slice(-4) === '.jpg');
+    assert('Photo name includes bluemilk_', nm.indexOf('bluemilk_') === 0);
+    assert('isSecureOrigin boolean', typeof isSecureOrigin() === 'boolean');
+    assert('fileToJpegBlob function', typeof fileToJpegBlob === 'function');
+
+    setStatus('Test status');
+    assert('setStatus shows overlay', els.status.className.indexOf('show') !== -1);
+
+    const prevBlob = photoBlob;
+    photoBlob = new Blob([new Uint8Array([0,1,2,3])], { type: 'image/png' });
+    setStatusRich('Test rich', 'ok', true);
+    assert('setStatusRich shows overlay', els.status.className.indexOf('show') !== -1);
+    assert('setStatusRich inserts miniThumb', els.status.innerHTML.indexOf('miniThumb') !== -1);
+    photoBlob = prevBlob;
+
+    assert('chem list hidden on init', els.chemResults.classList.contains('hidden'));
+
+    var t1 = parseChemicals({result:[{product_name:'P',manufacturer:'M'}]});
+    assert('parseChemicals result[]=array', Array.isArray(t1) && t1.length===1);
+    var t2 = parseChemicals({result:{chemicals:[{product_name:'Q',manufacturer:'N'}]}});
+    assert('parseChemicals result.chemicals', Array.isArray(t2) && t2.length===1);
+    var t3 = parseChemicals({chemicals:[{product_name:'R',manufacturer:''}]});
+    assert('parseChemicals chemicals at root', Array.isArray(t3) && t3.length===1);
+    var t4 = parseChemicals({});
+    assert('parseChemicals empty -> []', Array.isArray(t4) && t4.length===0);
+
+    return results.every(function(r){ return r.pass; });
+  }
+
+  (async function init(){
+    migrateFromLegacy();
+    if(!isSecureOrigin()){
+      setStatus('Use HTTPS or localhost for camera access.', 'warn');
+    }
+    loadSettings();
+    renderChemicals([]); // hidden initially
+    runSelfTests();
+    await startCamera();
+  })();
+
+  window.addEventListener('beforeunload', function(){ stopCamera(); });
   </script>
 
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" crossorigin="anonymous"></script>
-  <noscript>Diese App benötigt JavaScript.</noscript>
+  <noscript>This app requires JavaScript.</noscript>
 </body>
 </html>
