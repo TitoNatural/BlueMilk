@@ -67,18 +67,29 @@
     .toast-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
     .toast-body{ margin:8px 0 0; max-height:40vh; overflow:auto; background:#0d0d0d; border:1px solid #1f1f1f; border-radius:8px; padding:8px; color:#e5e5ea; white-space:pre-wrap; word-break:break-word; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size:12px; }
 
-    /* ===== Settings sheet ===== */
-    .sheet{ position:fixed; inset:0; display:none; background:rgba(0,0,0,.6); z-index:30; }
-    .sheet.active{ display:block; }
-    .sheet .panel{ position:absolute; inset:auto 0 0 0; border-top-left-radius:18px; border-top-right-radius:18px; background:var(--panel); border-top:1px solid #1e1e1e; padding-bottom:env(safe-area-inset-bottom); }
-    .grab{ width:40px; height:5px; border-radius:999px; background:#3a3a3a; margin:10px auto 4px; }
-    .panel h3{ margin:6px 16px 10px; font-size:14px; color:#cfcfd6; font-weight:600; }
-    .list{ background:#111; border-top:1px solid #1a1a1a; border-bottom:1px solid #1a1a1a; margin:8px 0; }
-    .cell{ display:flex; align-items:center; gap:12px; padding:12px 16px; border-top:1px solid #1a1a1a; }
-    .cell:first-child{ border-top:none; }
-    .cell label{ flex:0 0 160px; font-size:14px; color:#c9c9cf; }
-    .cell input{ flex:1; background:#0b0b0b; border:1px solid #1f1f1f; color:var(--text); border-radius:10px; padding:10px 12px; font-size:14px; }
-    .panel .actions{ display:flex; gap:8px; padding:12px 16px 16px; }
+  /* ===== Settings sheet ===== */
+  .sheet{ position:fixed; inset:0; display:none; background:rgba(0,0,0,.6); z-index:30; }
+  .sheet.active{ display:block; }
+  .sheet .panel{ position:absolute; inset:auto 0 0 0; border-top-left-radius:18px; border-top-right-radius:18px; background:var(--panel); border-top:1px solid #1e1e1e; padding-bottom:env(safe-area-inset-bottom); }
+  .grab{ width:40px; height:5px; border-radius:999px; background:#3a3a3a; margin:10px auto 4px; }
+  .panel h3{ margin:6px 16px 10px; font-size:14px; color:#cfcfd6; font-weight:600; }
+  .list{ background:#111; border-top:1px solid #1a1a1a; border-bottom:1px solid #1a1a1a; margin:8px 0; }
+  .cell{ display:flex; align-items:center; gap:12px; padding:12px 16px; border-top:1px solid #1a1a1a; }
+  .cell:first-child{ border-top:none; }
+  .cell label{ flex:0 0 160px; font-size:14px; color:#c9c9cf; }
+  .cell input{ flex:1; background:#0b0b0b; border:1px solid #1f1f1f; color:var(--text); border-radius:10px; padding:10px 12px; font-size:14px; }
+  .panel .actions{ display:flex; gap:8px; padding:12px 16px 16px; }
+
+  /* ===== QR overlay ===== */
+  .overlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.92); z-index:40; }
+  .overlay.active{ display:flex; }
+  .overlay .inner{ width:min(720px,92vw); padding:16px; display:flex; flex-direction:column; align-items:center; gap:18px; text-align:center; }
+  .overlay .inner h3{ margin:0; font-size:18px; font-weight:600; color:#f5f5f7; }
+  .overlay .inner p{ margin:0; font-size:14px; color:#d0d0d5; line-height:1.4; max-width:460px; }
+  .overlay .inner .qr-frame{ position:relative; display:inline-block; border-radius:16px; overflow:hidden; }
+  .overlay .inner .qr-frame::after{ content:""; position:absolute; inset:12px; border:2px dashed rgba(10,132,255,.55); border-radius:12px; animation:pulse 1.8s ease-in-out infinite; pointer-events:none; }
+  .overlay .inner button{ align-self:center; }
+  @keyframes pulse{ 0%{ opacity:.35; transform:scale(.92);} 50%{ opacity:.9; transform:scale(1);} 100%{ opacity:.35; transform:scale(.92);} }
   .btn{ display:inline-flex; align-items:center; gap:8px; padding:10px 12px; border-radius:12px; background:#1a1a1a; color:var(--text); border:1px solid #2a2a2a; cursor:pointer; user-select:none; text-decoration:none; font-size:14px; }
     .btn.primary{ background:linear-gradient(180deg,#2b77ff,#0a51ff); border-color:#1649ff; }
   </style>
@@ -170,7 +181,12 @@
 
   <div class="overlay" id="qrOverlay" role="dialog" aria-modal="true">
     <div class="inner">
-      <video id="qrVideo" playsinline muted class="preview" style="border-radius:12px; border:1px solid #1a1a1a;"></video>
+      <h3>Scan location QR code</h3>
+      <p>Align the QR code inside the frame. Scanning stops automatically as soon as a code is recognized.</p>
+      <div class="qr-frame">
+        <video id="qrVideo" playsinline muted class="preview" style="border-radius:16px; border:1px solid #1a1a1a;"></video>
+      </div>
+      <button class="iconbtn ghost" type="button" id="closeQrOverlay">Cancel</button>
     </div>
   </div>
 
@@ -224,8 +240,9 @@
     scanQrBtn: document.getElementById('scanQrBtn'),
     qrOverlay: document.getElementById('qrOverlay'),
     qrVideo: document.getElementById('qrVideo'),
-    photoPicker: document.getElementById('photoPicker'),
+  photoPicker: document.getElementById('photoPicker'),
     filePick: document.getElementById('filePick'),
+  closeQrOverlay: document.getElementById('closeQrOverlay'),
 
     chemResults: document.getElementById('chemResults'),
     chemList: document.getElementById('chemList'),
@@ -588,6 +605,7 @@
   });
 
   els.reqToastClose.addEventListener('click', hideRequestLog);
+  if(els.closeQrOverlay){ els.closeQrOverlay.addEventListener('click', function(){ stopQrScan(); }); }
   els.qrOverlay.addEventListener('click', function(ev){ if(ev.target === els.qrOverlay){ stopQrScan(); } });
   document.addEventListener('keydown', function(ev){ if(ev.key === 'Escape'){ stopQrScan(); } });
 
