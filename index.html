@@ -93,10 +93,10 @@
         <div class="gridlines" aria-hidden="true"></div>
         <div class="hud">
           <div class="toprow">
-            <span class="chip" id="locHint">Scan QR to sign into a location</span>
+            <span class="chip" id="locChip">Location: <span id="locationValue">—</span></span>
           </div>
           <div class="bottomrow row">
-            <input id="location" class="pill mono hidden" aria-hidden="true" />
+            <input id="location" class="pill mono" placeholder="Scan QR or type storage/area" />
             <button id="scanQrBtn" class="iconbtn" type="button" aria-label="QR">
               <svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <rect x="3" y="3" width="6" height="6" stroke="currentColor" stroke-width="2"/>
@@ -215,8 +215,9 @@
 
     status: document.getElementById('status'),
 
-    location: document.getElementById('location'),
-    locHint: document.getElementById('locHint'),
+  location: document.getElementById('location'),
+  locChip: document.getElementById('locChip'),
+  locationValue: document.getElementById('locationValue'),
 
     scanQrBtn: document.getElementById('scanQrBtn'),
     qrOverlay: document.getElementById('qrOverlay'),
@@ -297,9 +298,10 @@
     return location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
   }
   function updateThumbFromBlob(blob){ if(!blob){ els.thumb.src=''; return; } els.thumb.src = URL.createObjectURL(blob); }
-  function updateLocationHint(){
-    const val = (els.location.value||'').trim();
-    els.locHint.textContent = val ? ('Signed into: ' + val) : 'Scan QR to sign into a location';
+  function updateLocationChip(){
+    var val = (els.location.value||'').trim();
+    if(els.locationValue){ els.locationValue.textContent = val || '—'; }
+    if(els.locChip){ els.locChip.dataset.state = val ? 'filled' : 'empty'; }
   }
   function hasUploadSettings(){ return (els.endpoint.value && els.endpoint.value.length>7) && (els.username.value && els.username.value.length>0); }
   function updateUploadButton(){ els.upload.disabled = !photoBlob || !hasUploadSettings(); }
@@ -510,8 +512,8 @@
       if(v.readyState >= 2){
         c.width = v.videoWidth; c.height = v.videoHeight; ctx.drawImage(v, 0, 0, c.width, c.height);
         const img = ctx.getImageData(0,0,c.width,c.height);
-        const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
-        if(code && code.data){ els.location.value = code.data.trim(); updateLocationHint(); setStatus('QR captured: ' + els.location.value, 'ok'); stopQrScan(); break; }
+    const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+    if(code && code.data){ els.location.value = code.data.trim(); updateLocationChip(); setStatus('QR captured: ' + els.location.value, 'ok'); stopQrScan(); break; }
       }
       await new Promise(function(r){ setTimeout(r,120); });
     }
@@ -526,7 +528,7 @@
     if(s.locationFieldName) els.locationFieldName.value = s.locationFieldName;
     if(typeof s.remember === 'boolean') els.remember.checked = s.remember; else els.remember.checked = true;
     updateUploadButton();
-    updateLocationHint();
+    updateLocationChip();
   }
   function saveSettings(){
     const payload = {
@@ -549,6 +551,7 @@
 
   document.getElementById('shutter').addEventListener('click', takePhoto);
   document.getElementById('upload').addEventListener('click', upload);
+  document.getElementById('location').addEventListener('input', updateLocationChip);
   document.getElementById('scanQrBtn').addEventListener('click', startQrScan);
 
   document.getElementById('filePick').addEventListener('change', async function(ev){
