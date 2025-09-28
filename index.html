@@ -24,7 +24,6 @@
 
     .view{ position:relative; display:grid; place-items:center; overflow:hidden; }
     .frame{ width:min(100vw, 900px); aspect-ratio: 3/4; background:#111; border-radius:16px; overflow:hidden; border:1px solid #1a1a1a; position:relative; }
-    /* iPhone camera feel: full-bleed video within a rounded frame */
     video.preview{ width:100%; height:100%; object-fit:cover; display:block; background:#000; }
     .gridlines{ position:absolute; inset:0; background:
       linear-gradient(90deg, transparent 32%, rgba(255,255,255,.08) 33%, rgba(255,255,255,.08) 34%, transparent 35%, transparent 65%, rgba(255,255,255,.08) 66%, rgba(255,255,255,.08) 67%, transparent 68%),
@@ -36,7 +35,6 @@
 
     .chip{ background:rgba(17,17,17,.7); border:1px solid rgba(255,255,255,.12); padding:6px 10px; border-radius:999px; font-size:12px; color:#e9e9ee; }
 
-    .shutterbar{ display:flex; align-items:center; justify-content:center; gap:18px; }
     .thumb{ width:48px; height:48px; border-radius:8px; background:#222; border:1px solid #333; object-fit:cover; }
     .shutter{ width:74px; height:74px; border-radius:50%; background:#fff; border:6px solid rgba(255,255,255,.35); cursor:pointer; box-shadow:0 0 0 2px rgba(255,255,255,.12) inset; }
     .shutter:active{ transform:scale(.98); }
@@ -60,7 +58,13 @@
     .chem-name{ font-weight:600; font-size:14px; color:#fff; }
     .chem-manu{ font-size:12px; color:#b7b7bd; margin-top:4px; }
 
-    /* ===== Settings sheet: mobile list style ===== */
+    /* ===== Request log toast (dismissible) ===== */
+    .toast{ position:fixed; left:50%; bottom:10px; transform:translateX(-50%); z-index:80; width:min(96vw, 760px); background:rgba(20,20,20,.95); border:1px solid #2a2a2a; border-radius:12px; box-shadow:0 10px 40px rgba(0,0,0,.6); padding:10px 12px; }
+    .toast.hidden{ display:none !important; }
+    .toast-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .toast-body{ margin:8px 0 0; max-height:40vh; overflow:auto; background:#0d0d0d; border:1px solid #1f1f1f; border-radius:8px; padding:8px; color:#e5e5ea; white-space:pre-wrap; word-break:break-word; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size:12px; }
+
+    /* ===== Settings sheet ===== */
     .sheet{ position:fixed; inset:0; display:none; background:rgba(0,0,0,.6); z-index:30; }
     .sheet.active{ display:block; }
     .sheet .panel{ position:absolute; inset:auto 0 0 0; border-top-left-radius:18px; border-top-right-radius:18px; background:var(--panel); border-top:1px solid #1e1e1e; padding-bottom:env(safe-area-inset-bottom); }
@@ -71,50 +75,29 @@
     .cell:first-child{ border-top:none; }
     .cell label{ flex:0 0 160px; font-size:14px; color:#c9c9cf; }
     .cell input{ flex:1; background:#0b0b0b; border:1px solid #1f1f1f; color:var(--text); border-radius:10px; padding:10px 12px; font-size:14px; }
-    .cell .toggle{ appearance:none; width:46px; height:28px; border-radius:999px; background:#333; position:relative; outline:none; cursor:pointer; border:1px solid #444; }
-    .cell .toggle:checked{ background:var(--accent); border-color:#0b5ed7; }
-    .cell .toggle::after{ content:""; position:absolute; top:2px; left:2px; width:24px; height:24px; border-radius:50%; background:#fff; transition:transform .18s ease; }
-    .cell .toggle:checked::after{ transform:translateX(18px); }
     .panel .actions{ display:flex; gap:8px; padding:12px 16px 16px; }
-    .btn{ display:inline-flex; align-items:center; gap:8px; padding:10px 12px; border-radius:12px; background:#1a1a1a; color:var(--text); border:1px solid #2a2a2a; cursor:pointer; user-select:none; text-decoration:none; font-size:14px; }
+    .btn{ display:inline-flex; align-items:center; gap:8px; padding:10px 12px; border-radius:12px; background:#1a1a1a; color:#var(--text); border:1px solid #2a2a2a; cursor:pointer; user-select:none; text-decoration:none; font-size:14px; }
     .btn.primary{ background:linear-gradient(180deg,#2b77ff,#0a51ff); border-color:#1649ff; }
-
-    /* QR overlay */
-    .overlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.92); z-index:40; }
-    .overlay.active{ display:flex; }
-    .overlay .inner{ width:min(720px,92vw); padding:12px; }
-
-    /* Misc */
-    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
-    .pill{ background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); padding:4px 8px; border-radius:999px; font-size:12px; color:#d8d8de; }
-    .row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .icon{ width:20px; height:20px; display:block; }
   </style>
 </head>
 <body>
   <div class="app">
-    <!-- Top bar: only settings (removed security & flip) -->
     <div class="topbar">
       <button id="openSettings" class="iconbtn" title="Settings">⚙️ Settings</button>
-      <div></div>
-      <div></div>
+      <div></div><div></div>
     </div>
 
-    <!-- Camera frame -->
     <div class="view">
       <div class="frame" id="cameraFrame">
         <video id="video" class="preview" playsinline muted></video>
         <div class="gridlines" aria-hidden="true"></div>
         <div class="hud">
           <div class="toprow">
-            <!-- Instruction at top-left -->
             <span class="chip" id="locHint">Scan QR to sign into a location</span>
           </div>
           <div class="bottomrow row">
-            <!-- Hidden field to hold scanned location (no visible text at bottom-left) -->
             <input id="location" class="pill mono hidden" aria-hidden="true" />
             <button id="scanQrBtn" class="iconbtn" type="button" aria-label="QR">
-              <!-- Simple QR icon (universal, inline SVG) -->
               <svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <rect x="3" y="3" width="6" height="6" stroke="currentColor" stroke-width="2"/>
                 <rect x="15" y="3" width="6" height="6" stroke="currentColor" stroke-width="2"/>
@@ -123,7 +106,6 @@
               </svg>
             </button>
             <label class="iconbtn" for="filePick" aria-label="Photos">
-              <!-- Simple photo icon (universal, inline SVG) -->
               <svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <rect x="3" y="5" width="18" height="14" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
                 <circle cx="9" cy="11" r="2" stroke="currentColor" stroke-width="2"/>
@@ -136,7 +118,6 @@
       </div>
     </div>
 
-    <!-- Bottom bar with shutter and optional manual upload -->
     <div class="bottombar">
       <img id="thumb" class="thumb" alt="thumbnail" />
       <button id="shutter" class="shutter" title="Take photo"></button>
@@ -146,16 +127,22 @@
     </div>
   </div>
 
-  <!-- Status line (rich capable) -->
   <div id="status" class="status">Ready.</div>
 
-  <!-- Results (detected chemicals) -->
   <section id="chemResults" class="results hidden">
     <h3>Detected chemicals</h3>
     <div id="chemList" class="chem-grid"></div>
   </section>
 
-  <!-- Settings sheet -->
+  <!-- Request log (dismissible) -->
+  <div id="reqToast" class="toast hidden" role="status" aria-live="polite">
+    <div class="toast-row">
+      <strong id="reqToastTitle">Request failure</strong>
+      <button id="reqToastClose" class="iconbtn">Close</button>
+    </div>
+    <pre id="reqToastBody" class="toast-body"></pre>
+  </div>
+
   <div id="settingsSheet" class="sheet" role="dialog" aria-modal="true">
     <div class="panel">
       <div class="grab"></div>
@@ -175,11 +162,9 @@
     </div>
   </div>
 
-  <!-- Hidden canvas and preview image for capture -->
   <canvas id="canvas" class="hidden"></canvas>
   <img id="preview" class="hidden" alt="preview" />
 
-  <!-- QR Scanner Overlay (no title) -->
   <div class="overlay" id="qrOverlay" role="dialog" aria-modal="true">
     <div class="inner">
       <video id="qrVideo" playsinline muted class="preview" style="border-radius:12px; border:1px solid #1a1a1a;"></video>
@@ -240,6 +225,11 @@
 
     chemResults: document.getElementById('chemResults'),
     chemList: document.getElementById('chemList'),
+
+    reqToast: document.getElementById('reqToast'),
+    reqToastTitle: document.getElementById('reqToastTitle'),
+    reqToastBody: document.getElementById('reqToastBody'),
+    reqToastClose: document.getElementById('reqToastClose'),
   };
 
   // ===== state =====
@@ -287,6 +277,15 @@
     scheduleStatusHide(cls || 'ok');
   }
 
+  function showRequestLog(text, title){
+    try{
+      els.reqToastTitle.textContent = title || 'Request failure';
+      els.reqToastBody.textContent = (text || '').toString();
+      els.reqToast.classList.remove('hidden');
+    }catch(e){}
+  }
+  function hideRequestLog(){ try{ els.reqToast.classList.add('hidden'); }catch(e){} }
+
   function b64(s){ return btoa(unescape(encodeURIComponent(s))); }
   function buildAuthHeader(u,p){ return 'Basic ' + b64((u||'') + ':' + (p||'')); }
   function nowIso(){ return new Date().toISOString(); }
@@ -318,7 +317,6 @@
     }
   }
 
-  // ===== parse helper for chemicals =====
   function parseChemicals(data){
     try{
       if(!data) return [];
@@ -330,7 +328,6 @@
     }catch(e){ return []; }
   }
 
-  // ===== image conversion helper (always JPEG) =====
   function fitSize(w, h, maxDim){
     if(!maxDim) maxDim = 2048;
     var rw = w, rh = h;
@@ -353,7 +350,6 @@
           }
         }
       }catch(e){}
-      // Fallback via Image element
       try{
         var reader = new FileReader();
         reader.onload = function(){
@@ -374,7 +370,6 @@
     });
   }
 
-  // ===== results renderer =====
   function renderChemicals(arr){
     if(!arr || !arr.length){
       els.chemList.innerHTML = '';
@@ -396,7 +391,6 @@
     try{ els.chemResults.scrollIntoView({ behavior:'smooth', block:'start' }); }catch(e){}
   }
 
-  // ===== diagnostics =====
   // ===== camera =====
   async function startCamera(){
     if(!isSecureOrigin()){
@@ -484,11 +478,16 @@
         setStatusRich('Upload successful.', 'ok', true);
         var chems = parseChemicals(data);
         renderChemicals(chems);
+        hideRequestLog();
       } else {
-        var msg = 'Server error ('+res.status+'): ' + (textBody ? textBody.slice(0,240) : (res.statusText||''));
-        setStatusRich(msg, 'err', true);
+        var detailStr = data ? JSON.stringify(data, null, 2) : textBody;
+        setStatusRich('Server error ('+res.status+'): ' + (res.statusText||''), 'err', true);
+        showRequestLog(('Server error ('+res.status+'): '+(res.statusText||'')) + '\n\n' + (detailStr||''), 'Request failure');
       }
-    }catch(err){ setStatusRich('Network error: ' + err.message, 'err', true); }
+    }catch(err){
+      setStatusRich('Network error: ' + err.message, 'err', true);
+      showRequestLog((err && err.stack) ? err.stack : String(err), 'Network error');
+    }
     finally{ els.upload.disabled = false; }
   }
 
@@ -547,11 +546,9 @@
   document.getElementById('closeSettings').addEventListener('click', function(){ els.settingsSheet.classList.remove('active'); });
   document.getElementById('resetSettings').addEventListener('click', function(){ store.clear(); loadSettings(); setStatus('Settings reset.', 'warn'); });
   document.getElementById('saveSettings').addEventListener('click', function(){ saveSettings(); els.settingsSheet.classList.remove('active'); });
-  
 
   document.getElementById('shutter').addEventListener('click', takePhoto);
   document.getElementById('upload').addEventListener('click', upload);
-
   document.getElementById('scanQrBtn').addEventListener('click', startQrScan);
 
   document.getElementById('filePick').addEventListener('change', async function(ev){
@@ -559,9 +556,8 @@
     try{
       setStatus('Converting to JPEG…', 'warn');
       var jpeg = await fileToJpegBlob(f);
-      // enforce JPEG type
       if(!(jpeg && jpeg.type && jpeg.type.indexOf('image/jpeg') === 0)){
-        // some browsers may return type=""; still treat as jpeg
+        // some browsers may leave type empty; still treat as jpeg
       }
       photoBlob = jpeg || f;
       photoName = derivePhotoName();
@@ -571,14 +567,16 @@
       await autoUploadOrSettings();
     }catch(e){
       setStatus('Photo conversion failed: ' + (e && e.message ? e.message : e), 'err');
+      showRequestLog(String(e && e.message ? e.message : e), 'Conversion error');
     }
   });
+
+  document.getElementById('reqToastClose').addEventListener('click', hideRequestLog);
 
   // ===== self-tests (lightweight) =====
   function runSelfTests(){
     const results = [];
     function assert(name, cond){ results.push({ name: name, pass: !!cond }); }
-    // existing tests
     const hdr = buildAuthHeader('u','p');
     assert('Auth header prefix', hdr.indexOf('Basic ') === 0);
     assert('Auth header body length > 6', hdr.length > 6);
@@ -588,7 +586,6 @@
     assert('isSecureOrigin boolean', typeof isSecureOrigin() === 'boolean');
     assert('fileToJpegBlob function', typeof fileToJpegBlob === 'function');
 
-    // overlay tests
     setStatus('Test status');
     assert('setStatus shows overlay', els.status.className.indexOf('show') !== -1);
 
@@ -599,10 +596,8 @@
     assert('setStatusRich inserts miniThumb', els.status.innerHTML.indexOf('miniThumb') !== -1);
     photoBlob = prevBlob;
 
-    // results should be hidden on init (no demo data rendered)
     assert('chem list hidden on init', els.chemResults.classList.contains('hidden'));
 
-    // parseChemicals shape tests (no DOM rendering)
     var t1 = parseChemicals({result:[{product_name:'P',manufacturer:'M'}]});
     assert('parseChemicals result[]=array', Array.isArray(t1) && t1.length===1);
     var t2 = parseChemicals({result:{chemicals:[{product_name:'Q',manufacturer:'N'}]}});
@@ -612,20 +607,16 @@
     var t4 = parseChemicals({});
     assert('parseChemicals empty -> []', Array.isArray(t4) && t4.length===0);
 
-    const list = results.map(function(r){ return '<div class="cell"><label>' + r.name + '</label><div>' + (r.pass? '✅' : '❌') + '</div></div>'; }).join('');
-    /* diagnostics UI removed */
     return results.every(function(r){ return r.pass; });
   }
 
-  // ===== init =====
   (async function init(){
     migrateFromLegacy();
     if(!isSecureOrigin()){
       setStatus('Use HTTPS or localhost for camera access.', 'warn');
     }
     loadSettings();
-    // ensure results are hidden at start
-    renderChemicals([]);
+    renderChemicals([]); // hidden initially
     runSelfTests();
     await startCamera();
   })();
@@ -633,7 +624,6 @@
   window.addEventListener('beforeunload', function(){ stopCamera(); });
   </script>
 
-  <!-- QR decoder -->
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" crossorigin="anonymous"></script>
   <noscript>This app requires JavaScript.</noscript>
 </body>
