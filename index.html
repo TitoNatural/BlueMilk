@@ -60,6 +60,12 @@
     .chem-card{ background:#0f0f10; border:1px solid #1f1f1f; border-radius:12px; padding:10px 12px; }
     .chem-name{ font-weight:600; font-size:14px; color:#fff; }
     .chem-manu{ font-size:12px; color:#b7b7bd; margin-top:4px; }
+  .chem-head{ display:flex; align-items:flex-start; gap:8px; }
+  .chem-meta{ flex:1; min-width:0; }
+  .chem-detail{ font-size:12px; color:#a7a7ad; margin-top:2px; }
+  .chem-badge{ display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:6px; font-size:13px; font-weight:600; background:#2a2a2d; color:#fff; flex:0 0 auto; }
+  .chem-badge.found{ background:#123b18; color:#30d158; }
+  .chem-badge.missing{ background:#3b1a18; color:#ff453a; }
 
     /* ===== Request log toast (dismissible) ===== */
     .toast{ position:fixed; left:50%; bottom:10px; transform:translateX(-50%); z-index:80; width:min(96vw, 760px); background:rgba(20,20,20,.95); border:1px solid #2a2a2a; border-radius:12px; box-shadow:0 10px 40px rgba(0,0,0,.6); padding:10px 12px; }
@@ -343,12 +349,45 @@
   function parseChemicals(data){
     try{
       if(!data) return [];
+      // New hazchem_matches format preferred
+      var matchesArr = data && data.result && Array.isArray(data.result.hazchem_matches) ? data.result.hazchem_matches : null;
+      if(matchesArr){
+        return matchesArr.map(function(item){
+          item = item || {};
+          var chem = item.chemical || {};
+            var mlist = Array.isArray(item.matches) ? item.matches : [];
+            var top = mlist[0] || null;
+            return {
+              product_name: (chem.product_name || chem.name || '').toString(),
+              manufacturer: (chem.manufacturer || chem.producer || '').toString(),
+              evidence: chem.evidence || '',
+              found: !!top,
+              match_document: top ? (top.document || '') : '',
+              relevance: top ? (typeof top.relevance_score === 'number' ? top.relevance_score : (typeof top.confidence === 'number' ? top.confidence : null)) : null,
+              raw: item
+            };
+        });
+      }
+      // Legacy fallbacks
       if(Array.isArray(data)) return data;
       if(data && Array.isArray(data.result)) return data.result;
       if(data && data.result && Array.isArray(data.result.chemicals)) return data.result.chemicals;
       if(Array.isArray(data.chemicals)) return data.chemicals;
       return [];
     }catch(e){ return []; }
+  }
+
+  function escapeHtml(str){
+    return (str==null?'':String(str)).replace(/[&<>"']/g,function(ch){
+      switch(ch){
+        case '&': return '&amp;';
+        case '<': return '&lt;';
+        case '>': return '&gt;';
+        case '"': return '&quot;';
+        case "'": return '&#39;';
+        default: return ch;
+      }
+    });
   }
 
   function fitSize(w, h, maxDim){
@@ -402,11 +441,27 @@
     var html = '';
     for(var i=0;i<arr.length;i++){
       var c = arr[i] || {};
-      var name = (c.product_name || c.name || '').toString();
-      var manu = (c.manufacturer || c.producer || '').toString(); manu = manu.trim(); if(!manu) manu = '—';
-      html += '<div class="chem-card">'
-            + '<div class="chem-name">' + (name || 'Unknown product') + '</div>'
-            + '<div class="chem-manu">' + (manu || 'Unknown manufacturer') + '</div>'
+      var product = (c.product_name || c.name || '').toString();
+      var manu = (c.manufacturer || c.producer || '').toString(); manu = (manu||'').trim(); if(!manu) manu = '—';
+      var found = !!c.found;
+      var doc = (c.match_document || '').toString();
+      var rel = (typeof c.relevance === 'number') ? Math.round(c.relevance * 100) : null; // if relevance_score already 0..1; if it's 0..100 adjust?
+      // Adjust if value seems like 0..1 vs 0..100
+      if(rel !== null && rel > 100){ rel = Math.round(c.relevance); }
+      if(rel !== null && rel <= 1){ rel = Math.round(c.relevance * 100); }
+      var badge = found
+        ? '<span class="chem-badge found" title="Match in database">✔</span>'
+        : '<span class="chem-badge missing" title="Not in database">✖</span>';
+      var line1 = found ? (doc || product || 'Unknown product') : (product || 'Unknown product');
+      var line2 = found
+        ? (rel !== null ? ('Relevance: ' + rel + '%') : 'Found in database')
+        : 'Not in database';
+  html += '<div class="chem-card">'
+    + '<div class="chem-head">' + badge + '<div class="chem-meta">'
+            + '<div class="chem-name">' + escapeHtml(line1) + '</div>'
+            + '<div class="chem-detail">' + escapeHtml(line2) + '</div>'
+            + '</div></div>'
+            + '<div class="chem-manu">' + escapeHtml(manu) + '</div>'
             + '</div>';
     }
     els.chemList.innerHTML = html;
@@ -642,6 +697,9 @@
     assert('parseChemicals chemicals at root', Array.isArray(t3) && t3.length===1);
     var t4 = parseChemicals({});
     assert('parseChemicals empty -> []', Array.isArray(t4) && t4.length===0);
+  var haz = parseChemicals({ result: { hazchem_matches: [ { chemical:{ product_name:'XProd', manufacturer:'XMan', evidence:'foo' }, matches:[{ document:'XProd Doc', relevance_score:0.87 }] } ] } });
+  assert('parseChemicals hazchem_matches length', Array.isArray(haz) && haz.length===1);
+  assert('hazchem match found=true', haz[0] && haz[0].found === true);
 
     return results.every(function(r){ return r.pass; });
   }
